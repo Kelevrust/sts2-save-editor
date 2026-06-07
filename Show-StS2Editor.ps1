@@ -169,7 +169,7 @@ function Set-RunState($hasRun) {
         $cbAddRelic,$btnAddRelic,$btnDelRelic,
         $cbAddPotion,$btnAddPotion,$btnDelPotion,
         $cbAddCard,$chkUpg,$btnAddCard,$btnDelCard,
-        $btnApply,$btnAhead
+        $btnApply,$btnAhead,$btnMap
     )
     foreach ($c in $editCtrls) { $c.Enabled = $hasRun }
     if ($hasRun) {
@@ -311,9 +311,10 @@ $btnDelCard = New-Button "Remove" 340 ($y-1) 80
 $y += 40
 
 # Info / utility buttons
-$btnAhead  = New-Button "What's Ahead" 10 $y 130
-$btnBuilds = New-Button "Builds"      150 $y 95
-$btnFind   = New-Button "Find save..." 250 $y 90   # opt-in manual locate (auto-detect fallback)
+$btnAhead  = New-Button "What's Ahead" 10 $y 100
+$btnMap    = New-Button "Run Map"     115 $y 78
+$btnBuilds = New-Button "Builds"      198 $y 62
+$btnFind   = New-Button "Find..."     265 $y 62   # opt-in manual locate (auto-detect fallback)
 $y += 32
 
 # Action buttons
@@ -547,6 +548,90 @@ $btnAhead.Add_Click({
     $tb.Dock = 'Fill'; $tb.Font = New-Object System.Drawing.Font("Consolas", 9)
     $tb.Text = $sb.ToString()
     $dlg.Controls.Add($tb)
+    [void]$dlg.ShowDialog()
+})
+
+# ---- run map (ASCII + Mermaid export) -----------------------------------
+$Global:STS2_SYM = @{ monster='M'; elite='E'; event='?'; ancient='N'; shop='$'; rest_site='R'; treasure='T'; boss='B' }
+function Get-NodeRt($n) { if ($n.rooms) { $n.rooms.room_type } else { $n.map_point_type } }
+function Clean-ModelId($mid, $rt) {
+    if (-not $mid) { return (Get-Culture).TextInfo.ToTitleCase(($rt -replace '_',' ')) }
+    $core = ($mid -split '\.',2)[-1]; $tier = ''
+    if ($core -match '_(WEAK|NORMAL|ELITE|BOSS)$') { $tier = $matches[1].ToLower(); $core = $core -replace '_(WEAK|NORMAL|ELITE|BOSS)$','' }
+    $name = (Get-Culture).TextInfo.ToTitleCase(($core -replace '_',' ').ToLower())
+    if ($tier -and $tier -ne 'normal') { $name = "$name ($tier)" }
+    return $name
+}
+function Format-RunMap($save) {
+    $sb = New-Object System.Text.StringBuilder
+    $char = $save.players[0].character_id -replace '^CHARACTER\.',''
+    [void]$sb.AppendLine("RUN MAP  -  $char  -  Seed $($save.rng.seed)  -  Ascension $($save.ascension)")
+    [void]$sb.AppendLine(('=' * 52))
+    $acts = $save.map_point_history; $lastA = $acts.Count - 1
+    for ($a=0; $a -lt $acts.Count; $a++) {
+        [void]$sb.AppendLine(""); [void]$sb.AppendLine("ACT $($a+1)")
+        $nodes = $acts[$a]; $lastN = $nodes.Count - 1
+        for ($i=0; $i -lt $nodes.Count; $i++) {
+            $n = $nodes[$i]; $rt = Get-NodeRt $n
+            $s = if ($STS2_SYM.ContainsKey($rt)) { $STS2_SYM[$rt] } else { '.' }
+            $name = Clean-ModelId ($n.rooms.model_id) $rt
+            $mark = if ($a -eq $lastA -and $i -eq $lastN) { '   <= latest' } else { '' }
+            [void]$sb.AppendLine(("  {0,2}  [{1}] {2,-26} hp {3}{4}" -f ($i+1),$s,$name,$n.player_stats.current_hp,$mark))
+        }
+    }
+    [void]$sb.AppendLine(""); [void]$sb.AppendLine("[M]onster [E]lite [?]event [`$]shop [R]est [T]reasure [B]oss [N]eow")
+    return $sb.ToString()
+}
+function Format-RunMapMermaid($save) {
+    $cls = @{ monster='monster'; elite='elite'; event='event'; ancient='event'; shop='shop'; rest_site='rest'; treasure='treasure'; boss='boss' }
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.AppendLine('graph TD')
+    foreach ($d in @('boss fill:#c0392b,color:#fff','elite fill:#e67e22,color:#fff','monster fill:#7f8c8d,color:#fff','event fill:#2980b9,color:#fff','shop fill:#27ae60,color:#fff','rest fill:#8e44ad,color:#fff','treasure fill:#f1c40f,color:#000')) {
+        [void]$sb.AppendLine("  classDef $d;")
+    }
+    $prev = $null; $acts = $save.map_point_history
+    for ($a=0; $a -lt $acts.Count; $a++) {
+        $nodes = $acts[$a]
+        for ($i=0; $i -lt $nodes.Count; $i++) {
+            $n = $nodes[$i]; $rt = Get-NodeRt $n; $id = "a$($a+1)f$($i+1)"
+            $name = (Clean-ModelId ($n.rooms.model_id) $rt) -replace '"',''
+            [void]$sb.AppendLine("  $id[`"A$($a+1).$($i+1) $name (hp $($n.player_stats.current_hp))`"]")
+            $c = if ($cls.ContainsKey($rt)) { $cls[$rt] } else { 'monster' }
+            [void]$sb.AppendLine("  class $id $c;")
+            if ($prev) { [void]$sb.AppendLine("  $prev --> $id") }
+            $prev = $id
+        }
+    }
+    return $sb.ToString()
+}
+$btnMap.Add_Click({
+    if (-not $script:save) { $lblStatus.Text = "No run loaded."; return }
+    $ascii   = Format-RunMap $script:save
+    $mermaid = Format-RunMapMermaid $script:save
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = "Run Map  (seed $($script:save.rng.seed))"
+    $dlg.Size = New-Object System.Drawing.Size(520, 660); $dlg.StartPosition = "CenterParent"
+    $tb = New-Object System.Windows.Forms.TextBox
+    $tb.Multiline=$true; $tb.ReadOnly=$true; $tb.ScrollBars='Vertical'; $tb.Dock='Fill'
+    $tb.Font = New-Object System.Drawing.Font("Consolas", 9); $tb.Text = ($ascii -replace "`n","`r`n")
+    $bar = New-Object System.Windows.Forms.Panel; $bar.Dock='Bottom'; $bar.Height=40
+    $bExp  = New-Object System.Windows.Forms.Button; $bExp.Text='Export .md';        $bExp.SetBounds(8,8,100,26)
+    $bLink = New-Object System.Windows.Forms.Button; $bLink.Text='Copy render link';  $bLink.SetBounds(114,8,130,26)
+    $lbl   = New-Object System.Windows.Forms.Label;  $lbl.SetBounds(250,12,250,22)
+    $bExp.Add_Click({
+        $fence = [string][char]96 * 3
+        $md = "# StS2 Run Map`r`n`r`nPaste the block below at https://kelevrust.github.io/sts2-save-editor/map.html (or https://mermaid.live) to view/download it.`r`n`r`n${fence}mermaid`r`n${mermaid}`r`n${fence}`r`n"
+        $p = Join-Path ([Environment]::GetFolderPath('Desktop')) 'StS2-run-map.md'
+        [System.IO.File]::WriteAllText($p, $md, [System.Text.UTF8Encoding]::new($false))
+        $lbl.Text = "Saved -> Desktop\StS2-run-map.md"
+    })
+    $bLink.Add_Click({
+        $b = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($mermaid)) -replace '\+','-' -replace '/','_' -replace '=',''
+        [System.Windows.Forms.Clipboard]::SetText("https://kelevrust.github.io/sts2-save-editor/map.html#m=$b")
+        $lbl.Text = "Render link copied to clipboard"
+    })
+    $bar.Controls.AddRange(@($bExp,$bLink,$lbl))
+    $dlg.Controls.Add($tb); $dlg.Controls.Add($bar)
     [void]$dlg.ShowDialog()
 })
 

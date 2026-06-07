@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StS2 Run Map renderer</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 24px; background:#1b1b1b; color:#e0e0e0; }
+  h2 { margin-top:0; }
+  textarea { width:100%; height:150px; font-family:Consolas,monospace; font-size:13px; box-sizing:border-box; }
+  button { padding:8px 16px; margin:8px 8px 8px 0; font-size:14px; cursor:pointer; }
+  #out { background:#fff; padding:12px; border-radius:8px; margin-top:12px; overflow:auto; }
+  .hint { color:#9aa; font-size:13px; }
+  a { color:#6cb6ff; }
+</style>
+</head>
+<body>
+  <h2>🃏 Slay the Spire 2 — Run Map renderer</h2>
+  <p class="hint">From the editor: click <b>Run Map → Copy render link</b> and open it — your map loads automatically.
+  Or paste a <code>mermaid</code> block (from <b>Export .md</b>) below and hit Render. No account, nothing uploaded — it renders in your browser.</p>
+  <textarea id="src" placeholder="paste the mermaid block here (the part between the ```mermaid fences)"></textarea>
+  <div>
+    <button onclick="render()">Render</button>
+    <button onclick="downloadPng()">Download PNG</button>
+  </div>
+  <div id="out"><span class="hint">Your map will appear here.</span></div>
+
+<script>
+mermaid.initialize({ startOnLoad:false, theme:'dark', securityLevel:'loose' });
+
+function b64urlDecode(s){
+  s = s.replace(/-/g,'+').replace(/_/g,'/');
+  while (s.length % 4) s += '=';
+  return decodeURIComponent(escape(atob(s)));
+}
+function stripFences(t){
+  const m = /```mermaid\s*([\s\S]*?)```/.exec(t);
+  return m ? m[1].trim() : t.trim();
+}
+async function render(){
+  const code = stripFences(document.getElementById('src').value);
+  if (!code) return;
+  try {
+    const { svg } = await mermaid.render('g' + Date.now(), code);
+    document.getElementById('out').innerHTML = svg;
+  } catch (e) {
+    document.getElementById('out').innerHTML = '<span style="color:#c0392b">Could not render: ' + e.message + '</span>';
+  }
+}
+function downloadPng(){
+  const svg = document.querySelector('#out svg');
+  if (!svg){ alert('Render a map first.'); return; }
+  const rect = svg.getBoundingClientRect();
+  const w = Math.max(800, Math.ceil(rect.width)), h = Math.max(600, Math.ceil(rect.height));
+  const xml = new XMLSerializer().serializeToString(svg);
+  const img = new Image();
+  img.onload = function(){
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const cx = c.getContext('2d');
+    cx.fillStyle = '#1b1b1b'; cx.fillRect(0,0,w,h);
+    cx.drawImage(img, 0, 0, w, h);
+    c.toBlob(function(b){
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b); a.download = 'sts2-run-map.png'; a.click();
+    });
+  };
+  img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
+}
+window.addEventListener('load', function(){
+  const m = /[#&]m=([^&]+)/.exec(location.hash);
+  if (m){ try { document.getElementById('src').value = b64urlDecode(m[1]); render(); } catch(e){} }
+});
+</script>
+</body>
+</html>
