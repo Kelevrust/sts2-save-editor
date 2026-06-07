@@ -29,12 +29,14 @@ $script:p        = $null   # players[0] shortcut
 $script:schema   = $null   # this save's schema_version
 
 # Canonical id lists mined from the game's pck (relic/potion atlases).
+# NOTE: -Encoding UTF8 is required - Windows PowerShell 5.1 defaults to ANSI,
+# which mangles the em-dashes in builds.json into mojibake.
 $idsPath = Join-Path $PSScriptRoot 'sts2-ids.json'
-$script:ids = if (Test-Path $idsPath) { Get-Content $idsPath -Raw | ConvertFrom-Json } else { $null }
+$script:ids = if (Test-Path $idsPath) { Get-Content $idsPath -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
 
 # Editable build cheatsheet (shown by the Builds button).
 $buildsPath = Join-Path $PSScriptRoot 'builds.json'
-$script:builds = if (Test-Path $buildsPath) { Get-Content $buildsPath -Raw | ConvertFrom-Json } else { $null }
+$script:builds = if (Test-Path $buildsPath) { Get-Content $buildsPath -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
 
 # "RELIC.AMETHYST_AUBERGINE" -> "Amethyst Aubergine"
 function Get-Friendly($id) {
@@ -382,12 +384,12 @@ function Format-Archetype($a) {
     # --- fast reference first ---
     if ($a.cards  -and $a.cards.Count) {
         [void]$sb.AppendLine("KEY CARDS")
-        foreach ($x in $a.cards)  { [void]$sb.AppendLine("  - $(($x -split ' — ',2)[0])") }   # name only, drop the effect tail
+        foreach ($x in $a.cards)  { [void]$sb.AppendLine("  - $(($x -split (' ' + [char]0x2014 + ' '),2)[0])") }   # name only, drop the effect tail
         [void]$sb.AppendLine("")
     }
     if ($a.relics -and $a.relics.Count) {
         [void]$sb.AppendLine("KEY RELICS")
-        foreach ($x in $a.relics) { [void]$sb.AppendLine("  - $(($x -split ' — ',2)[0])") }
+        foreach ($x in $a.relics) { [void]$sb.AppendLine("  - $(($x -split (' ' + [char]0x2014 + ' '),2)[0])") }
         [void]$sb.AppendLine("")
     }
     [void]$sb.AppendLine(("-" * 46))

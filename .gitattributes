@@ -1,0 +1,14 @@
+# Normalize line endings so contributors don't churn the whole file.
+* text=auto
+
+# Windows-specific scripts need CRLF
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# JSON data: keep LF
+*.json text eol=lf
+
+# Binary assets
+*.png  binary
+*.jpg  binary
+*.save binary

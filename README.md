@@ -9,6 +9,8 @@ no install, no dependencies, all plain-text so you can read every line before ru
 
 ![Windows only](https://img.shields.io/badge/platform-Windows-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
+![Editor and build cheatsheet](docs/screenshot.png)
+
 ## What it does
 
 - **Edit your current run** — gold, current/max HP (with Full Heal), ascension.
