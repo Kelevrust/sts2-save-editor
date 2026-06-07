@@ -89,6 +89,18 @@ If an edit ever "doesn't work," Steam Cloud is still on somewhere.
 | `sts2-ids.json` | Every relic/potion/card ID (rebuilt by *Refresh IDs*) |
 | `builds.json` | The build cheatsheet — plain text, edit freely |
 
+## 🃏 Tip jar (optional)
+
+It's free forever. But if it saved a run and you feel like it, the shopkeeper accepts coin — pay whatever you want, or nothing at all:
+
+<a href="https://buy.stripe.com/3cI6oJarleVY7fA3CgdQQ00"><img src="docs/tip-coin.png" width="90" align="left" hspace="12"></a>
+
+**[Remove a card from your deck →](https://buy.stripe.com/3cI6oJarleVY7fA3CgdQQ00)**
+
+Completely optional, no features locked behind it, no judgment either way.
+
+<br clear="left">
+
 ## License
 
 MIT — free to use, change, and share. See [LICENSE](LICENSE).
