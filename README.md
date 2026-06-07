@@ -39,11 +39,12 @@ This trips up almost everyone. Steam re-downloads its cloud copy over your edit,
 
 If an edit ever "doesn't work," Steam Cloud is still on somewhere.
 
-> **Got more than one PC?** Edit on the machine that has the run you actually want, and
-> keep Cloud off while you do it. If you edit an older local run and later turn Cloud back
-> on (or launch the game on another PC), Steam may show a **Cloud Conflict** — choose the
-> version you just edited, or you could overwrite a newer run. Safest: do all your editing
-> in one place.
+> **Play on more than one device (a Steam Deck, a second PC)?** This editor is Windows-only,
+> so you'd edit on your PC while another device may hold a different run. Edit on the
+> machine with the run you actually want, keep Cloud off while you do it, and if Steam later
+> shows a **Cloud Conflict** (when you re-enable Cloud or launch on the other device),
+> choose the version you just edited — otherwise you could overwrite a newer run. Safest:
+> do all your editing in one place.
 
 ## What it does
 
