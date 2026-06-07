@@ -1,0 +1,414 @@
+{
+  "_note": "Editable build cheatsheet shown by the editor's 'Builds' button. Card/relic effects are mined from the game's pck (reliable); archetype groupings and 'go-to' picks are mechanics-based judgment, not a scraped tier list. Relics in StS2 are mostly shared by rarity (not class-locked except starters), so these are matched by SYNERGY. Edit freely.",
+  "CHARACTER.SILENT": {
+    "name": "Silent",
+    "archetypes": [
+      {
+        "name": "Shivs (Blade Volume)",
+        "summary": "Flood each turn with 0-cost Shiv attacks. Shivs count as Attacks, so they trigger per-attack relics absurdly fast. You scale with FLAT per-Shiv bonuses (add +X, throw 8 Shivs = +8X).",
+        "cards": [
+          "Accuracy — Shivs deal additional damage (the core scaler; upgrade it)",
+          "Phantom Blades — Shivs gain Retain; first Shiv each turn hits for +9",
+          "Cloak and Dagger — gain Block AND add Shivs",
+          "Blade Dance — add a burst of Shivs",
+          "Infinite Blades — +1 Shiv at the start of every turn, forever",
+          "Storm of Steel — discard your hand; add a Shiv per card discarded",
+          "Sharp Edge — every Shiv you create is Upgraded",
+          "Finisher — deal damage for EACH Attack played this turn (kill button)",
+          "Knife Trap — play every Shiv in your Exhaust pile at the enemy"
+        ],
+        "relics": [
+          "Shuriken — gain Strength every N Attacks in a turn (best-in-slot; Strength buffs every Shiv)",
+          "Pen Nib — every 10th Attack deals double (you hit 10 fast)",
+          "The Boot — raises tiny unblocked hits to a floor (huge for low-damage Shivs)",
+          "Kunai — gain Dexterity every N Attacks (Block scaling)",
+          "Ornamental Fan — gain Block every N Attacks",
+          "Helical Dart — play a Shiv, gain Dexterity (snowballs)",
+          "Ninja Scroll — start each combat with free Shivs in hand"
+        ],
+        "combos": [
+          "Dump 6-8 Shivs, then Finisher for a one-shot",
+          "Accuracy + Sharp Edge = a stream of upgraded, buffed Shivs",
+          "The Boot turns 4-damage Shivs into reliable chunks; Shuriken beats Kunai for damage (Strength hits every Shiv)"
+        ],
+        "pitfalls": "Don't over-collect generators (3+ floods your hand and dilutes draws to the payoffs). The payoffs win games; Shivs are just ammo."
+      },
+      {
+        "name": "Poison (Damage-over-time)",
+        "summary": "Stack Poison; it ticks every turn and ignores Block. Excellent vs high-HP bosses and elites. You're racing to ramp Poison faster than the enemy can kill you, so pair with early survival.",
+        "cards": [
+          "Noxious Fumes — apply Poison to ALL enemies every turn (the engine)",
+          "Deadly Poison — cheap burst of Poison",
+          "Bouncing Flask — apply Poison to a random enemy several times",
+          "Bubble Bubble — if the enemy already has Poison, apply more (snowball)",
+          "Envenom — whenever an Attack deals unblocked damage, also apply Poison (turns Shivs into poison spam)",
+          "Corpse Explosion — on the enemy's death, spread its Poison to others (AoE finisher)",
+          "Malaise — strip enemy Strength and apply Weak (control vs scary attackers)"
+        ],
+        "relics": [
+          "Snecko Skull — every Poison you apply applies +1 extra (compounds the whole ramp)",
+          "Twisted Funnel — apply Poison to ALL enemies at the start of each combat"
+        ],
+        "combos": [
+          "Noxious Fumes + Snecko Skull = compounding AoE that snowballs every turn",
+          "Envenom + lots of small attacks (Shivs!) = a poison-application machine",
+          "Bubble Bubble after any poison source = cheap doubling"
+        ],
+        "pitfalls": "Slow to come online — you need Block/survival early or you die before the DoT lands. Weak against very short fights and enemies that wipe debuffs."
+      },
+      {
+        "name": "Discard / Hand-Cycling (engine, not a wincon)",
+        "summary": "Discarding triggers payoffs and cycles your deck fast to find combos and refund energy. This is the GLUE that powers a Shiv or Poison kill engine — it isn't damage by itself.",
+        "cards": [
+          "Calculated Gamble — discard your hand, then draw that many (huge churn + discard triggers)",
+          "Acrobatics — draw cards, discard 1",
+          "Reflex — draw cards (and refunds value when discarded)",
+          "Tactician — gain Energy when discarded (your energy engine)",
+          "Expertise — draw up to a full hand"
+        ],
+        "relics": [
+          "Gambling Chip — discard any number of cards then redraw at combat start (sets up turn 1)",
+          "Tingsha — discard a card during your turn, deal damage to a random enemy (damage engine)",
+          "Tough Bandages — discard a card, gain Block (defense engine)"
+        ],
+        "combos": [
+          "Calculated Gamble + Tingsha = mass-discard burst damage",
+          "Calculated Gamble + Tough Bandages = mass-discard wall of Block",
+          "Discard pairs with Shivs/Poison as the delivery system"
+        ],
+        "pitfalls": "Discard alone wins nothing — always pair it with a real damage archetype (Shivs or Poison). Note: Runic Pyramid (keep your hand) is the OPPOSITE plan — don't mix it in."
+      },
+      {
+        "name": "Support: Survival / Dexterity",
+        "summary": "Splash cards/relics that keep you alive while Shivs or Poison ramp. Not a standalone build.",
+        "cards": [
+          "Footwork — gain Dexterity (more Block from every Block card)",
+          "Blur — Block carries to next turn",
+          "After Image — gain Block whenever you play a card (great with high card volume)"
+        ],
+        "relics": [
+          "Sturdy Clamp — some Block persists across turns",
+          "Vambrace — double your first Block from a card each combat",
+          "Sai — gain Block at the start of your turn"
+        ],
+        "combos": ["After Image + Shiv volume = passive Block stacking every turn"],
+        "pitfalls": "Pure defense doesn't close games — keep enough offense to actually kill."
+      }
+    ]
+  },
+  "CHARACTER.IRONCLAD": {
+    "name": "Ironclad",
+    "archetypes": [
+      {
+        "name": "Strength",
+        "summary": "Stack permanent Strength so every Attack hits harder, then multiply it. Multi-hit attacks turn each point of Strength into several points of damage.",
+        "cards": [
+          "Inflame — gain Strength (flat)",
+          "Limit Break — double your current Strength (the multiplier)",
+          "Demon Form — gain Strength at the start of every turn (scaling power)",
+          "Rupture — whenever you lose HP on your turn, gain Strength",
+          "Spot Weakness / Vicious — apply Vulnerable and gain Strength for each Vulnerable on the enemy",
+          "Twin Strike / Sword Boomerang / Whirlwind — multi-hit attacks that each gain your Strength",
+          "Bludgeon — a single huge hit to dump Strength into"
+        ],
+        "relics": [
+          "Vajra / Sword of Jade — start each combat with Strength",
+          "Ruined Helmet — double your first Strength gain each combat",
+          "Girya — bank Strength at rest sites (up to 3)",
+          "Red Skull — extra Strength while at low HP",
+          "Sling of Courage — start elite fights with Strength"
+        ],
+        "combos": [
+          "Demon Form + Limit Break = exponential Strength",
+          "Ruined Helmet + your first Strength card = a doubled head start",
+          "High Strength + any multi-hit (Whirlwind/Twin Strike) = damage scales per hit"
+        ],
+        "pitfalls": "Strength is slow turn 1 — don't durdle stacking it against fast elites. Needs a payoff hit; raw Strength with no big/multi-hit attack does nothing."
+      },
+      {
+        "name": "Block / Barricade",
+        "summary": "Keep Block between turns with Barricade, then convert that stockpile into damage. The tankiest, most consistent Ironclad shell.",
+        "cards": [
+          "Barricade — Block is no longer removed at the start of your turn (the keystone)",
+          "Body Slam — deal damage equal to your current Block (the payoff)",
+          "Juggernaut — whenever you gain Block, deal damage to a random enemy",
+          "Impervious — a single huge chunk of Block",
+          "Feel No Pain — gain Block whenever a card is Exhausted",
+          "Shrug It Off / Iron Wave — efficient Block (+ a little offense)"
+        ],
+        "relics": [
+          "Sturdy Clamp — Block persists across turns (a poor-man's Barricade)",
+          "Vambrace — double your first Block from a card each combat",
+          "Orichalcum — gain Block if you end your turn with none",
+          "Cloak Clasp — Block for each card left in your hand at end of turn",
+          "Tungsten Rod — lose less HP from every source (survival)",
+          "Bronze Scales — start each combat with Thorns"
+        ],
+        "combos": [
+          "Barricade + Body Slam = stack Block over turns, then one-shot with it",
+          "Barricade + Juggernaut = every Block card also pings the enemy",
+          "Vambrace doubles a big Block card; Sturdy Clamp banks it before you even find Barricade"
+        ],
+        "pitfalls": "Without Body Slam or Juggernaut, a Block stack is just defense and you stall out. Barricade is the build — prioritize finding it."
+      },
+      {
+        "name": "Exhaust",
+        "summary": "Turn cards leaving your deck into a resource — Block, draw, and damage per Exhaust. Thins the deck so you draw your bombs every fight.",
+        "cards": [
+          "Corruption — Skills cost 0 but Exhaust when played (the engine)",
+          "Feel No Pain — gain Block whenever a card is Exhausted",
+          "Dark Embrace — draw a card whenever a card is Exhausted",
+          "Fiend Fire — Exhaust your whole hand, deal damage per card Exhausted (finisher)",
+          "Second Wind — Exhaust all non-Attacks, gain Block per card"
+        ],
+        "relics": [
+          "Charon's Ashes — whenever you Exhaust a card, deal damage to ALL enemies",
+          "Joss Paper — every N cards Exhausted, draw cards",
+          "Burning Sticks — first Skill you Exhaust each combat, copy it back to hand",
+          "Toasty Mittens — Exhaust your top card each turn and gain Strength"
+        ],
+        "combos": [
+          "Corruption + Dark Embrace + Feel No Pain = free Skills that draw AND Block on every play",
+          "Corruption + Charon's Ashes = each free Skill also nukes the room",
+          "Fiend Fire after building a fat hand = burst finisher"
+        ],
+        "pitfalls": "Don't Exhaust away your win conditions. The engine needs a payoff (Feel No Pain / Dark Embrace / Charon's Ashes) or you just thin into nothing."
+      },
+      {
+        "name": "Support: HP-as-Resource",
+        "summary": "Pay HP for tempo and energy. Splash that supercharges Strength (via Rupture) and pushes explosive turns. Pairs with Block/heal to stay alive.",
+        "cards": [
+          "Bloodletting — lose HP, gain Energy",
+          "Offering — lose HP, gain Energy and draw",
+          "Hemokinesis — lose HP, deal big damage",
+          "Rupture — converts that self-damage into Strength"
+        ],
+        "relics": [
+          "Self-Forming Clay — whenever you lose HP in combat, gain Block next turn",
+          "Red Skull — bonus Strength while at low HP",
+          "Burning Blood — heal at the end of combat (offsets the cost)"
+        ],
+        "combos": ["Self-damage cards + Rupture = pay HP, get Strength every time", "Self-Forming Clay turns the HP you spend into Block"],
+        "pitfalls": "It's HP, not free — without sustain you bleed out. Note Tungsten Rod REDUCES Rupture's payoff (less HP lost), so it's a survival pick, not a Rupture combo."
+      }
+    ]
+  },
+  "CHARACTER.DEFECT": {
+    "name": "Defect",
+    "archetypes": [
+      {
+        "name": "Orbs 101 (read this first)",
+        "summary": "Defect channels Orbs into slots. Each Orb has a passive (every turn) and an Evoke (one-time burst when removed). Focus boosts most Orb output. Lightning hits enemies, Frost gives Block, Dark grows then bursts, Plasma gives Energy.",
+        "cards": [
+          "Channel = create an Orb in a slot; Evoke = trigger and remove the leftmost/rightmost",
+          "Capacitor — gain Orb Slots (more Orbs at once)",
+          "Defragment — gain Focus (boosts Lightning/Frost/Dark output)",
+          "Dualcast / Multi-Cast / Quadcast — Evoke your rightmost Orb multiple times"
+        ],
+        "relics": [
+          "Cracked Core / Infused Core — start each combat Channeling Lightning",
+          "Runic Capacitor — start with extra Orb Slots",
+          "Gold Plated Cables — your rightmost Orb triggers its passive an extra time",
+          "Data Disk — start each combat with Focus",
+          "Metronome — Channel N Orbs in a combat, deal damage to ALL enemies"
+        ],
+        "combos": ["Capacitor + a Channel engine = a wall of Orbs all triggering every turn", "Gold Plated Cables doubles your most valuable rightmost Orb's passive"],
+        "pitfalls": "Don't channel orbs you can't use (full slots Evoke the oldest). Pick a color identity rather than a random rainbow."
+      },
+      {
+        "name": "Lightning (aggro)",
+        "summary": "Spam Lightning Orbs; their passive zaps a random enemy each turn (or all enemies with the right upgrade). Focus + Multicast scale it into a machine gun.",
+        "cards": [
+          "Ball Lightning — deal damage and Channel a Lightning",
+          "Zap — Channel Lightning cheaply",
+          "Storm — whenever you play a Power, Channel a Lightning",
+          "Electrodynamics / Tesla — Lightning hits ALL enemies and/or trigger all Lightning",
+          "Lightning Mastery — Channel + draw + play synergy"
+        ],
+        "relics": [
+          "Cracked Core / Infused Core — free Lightning at combat start",
+          "Gold Plated Cables — rightmost Lightning passive triggers twice",
+          "Data Disk — Focus = each Lightning hits harder"
+        ],
+        "combos": ["Many Lightning Orbs + Focus + Multicast = huge per-turn AoE", "Electrodynamics makes every Lightning passive hit the whole room"],
+        "pitfalls": "Single-target Lightning passives hit RANDOM enemies — get an 'all enemies' upgrade or it whiffs in big fights."
+      },
+      {
+        "name": "Frost (Block / control)",
+        "summary": "Channel Frost for Block every turn — a defensive scaling shell that outlasts the enemy, then closes with a splash of damage.",
+        "cards": [
+          "Glacier — gain Block and Channel Frost",
+          "Cold Snap — deal damage and Channel Frost",
+          "Chill — Channel a Frost for each enemy",
+          "Coolheaded — Channel Frost and draw"
+        ],
+        "relics": [
+          "Data Disk — Focus = more Block per Frost",
+          "Runic Capacitor — more Orb Slots = more Frost up at once",
+          "Gorget — start each combat with Plating"
+        ],
+        "combos": ["Many Frost + Focus = passive Block wall every turn", "Pair with a damage Orb or big Evoke to actually kill"],
+        "pitfalls": "All defense, no offense = you stall out. Keep a win condition (Dark/Lightning or a big Evoke)."
+      },
+      {
+        "name": "Dark + Focus/Powers (scaling burst)",
+        "summary": "Dark Orbs grow each turn, then Evoke for a massive single hit. Powers and Focus engines (and Echo Form) make the whole deck snowball.",
+        "cards": [
+          "Darkness — Channel Dark (and trigger all Dark passives to grow them faster)",
+          "Biased Cognition — huge Focus now (you lose some each turn)",
+          "Echo Form — the first card you play each turn is played twice",
+          "Creative AI — add a random Power to hand every turn",
+          "Multi-Cast — Evoke a fully-grown Dark Orb several times for a nuke"
+        ],
+        "relics": [
+          "Symbiotic Virus — start each combat Channeling a Dark",
+          "Mummified Hand — whenever you play a Power, a card becomes free",
+          "Game Piece — play a Power, draw cards",
+          "Lost Wisp — play a Power, deal damage to ALL enemies",
+          "Permafrost — first Power each combat, gain Block"
+        ],
+        "combos": ["Grow Dark Orbs for a few turns, then Multi-Cast Evoke for a one-shot", "Echo Form + Multi-Cast or a key Power = double everything", "Mummified Hand makes a Power-heavy turn nearly free"],
+        "pitfalls": "Dark is slow — it needs setup turns and survival. Don't Evoke Dark Orbs early before they've grown."
+      }
+    ]
+  },
+  "CHARACTER.REGENT": {
+    "name": "Regent",
+    "archetypes": [
+      {
+        "name": "Forge / Sovereign Blade (weapon)",
+        "summary": "Forge stacks empower your Sovereign Blade — a recurring weapon card that gets upgraded to hit harder, hit all enemies, and hit extra times. Build a forge engine, then swing the Blade every turn.",
+        "cards": [
+          "Sovereign Blade — your signature weapon; Forge upgrades it (double damage / hits ALL / extra hits)",
+          "The Smith — Forge at the start of every turn (the engine)",
+          "Beat into Shape — deal damage, Forge, and Forge extra for each prior hit this combat",
+          "Seeking Edge — pull Sovereign Blade into your hand from anywhere and Forge",
+          "Sword Sage — Sovereign Blade now hits an additional time",
+          "Refine Blade / Heirloom Hammer / Hammer Time — extra Forge value"
+        ],
+        "relics": [
+          "Fencing Manual — Forge at the start of each combat (free engine start)",
+          "Vajra / Sword of Jade — start with Strength (adds to every Blade hit)",
+          "Miniature Cannon — Upgraded Attacks deal extra (Sovereign Blade scales with it)",
+          "Girya — bank Strength at rest sites"
+        ],
+        "combos": [
+          "Fencing Manual + The Smith = Forge from turn 1, every turn",
+          "Seeking Edge keeps the Blade in hand; Sword Sage + a 'hits all' upgrade = AoE weapon",
+          "Strength relics stack on top of every Blade hit"
+        ],
+        "pitfalls": "Dead without the Blade in hand — prioritize a retrieval/forge engine. Over-forging with no swing wastes turns."
+      },
+      {
+        "name": "Light / Cosmic (spend-Light AoE)",
+        "summary": "Generate Light each turn, then spend it for room-clearing damage and Block. A scaling caster shell that snowballs the longer the fight goes.",
+        "cards": [
+          "Genesis — gain Light at the start of every turn (the engine)",
+          "Gather Light — gain Block and Light",
+          "Glow — gain Light and draw",
+          "Radiate — deal damage to ALL enemies for each Light gained this turn (payoff)",
+          "Child of the Stars — whenever you spend Light, gain Block for each Light spent",
+          "Supermassive / Big Bang / Meteor Shower — Light-fueled AoE nukes"
+        ],
+        "relics": [
+          "Mini Regent — the first Light you spend each turn, gain Strength",
+          "Galactic Dust — for every Light spent, gain Block"
+        ],
+        "combos": [
+          "Genesis ramps Light passively; dump it with Radiate/Supermassive for AoE",
+          "Big Light spends + Galactic Dust + Child of the Stars = a Block wall the same turn you nuke",
+          "Mini Regent quietly turns the Light engine into a Strength engine too"
+        ],
+        "pitfalls": "Ramp-dependent — slow against fast elites. You need enough Light generation before the payoffs are worth a card."
+      },
+      {
+        "name": "Card-Creation (scaler / glue)",
+        "summary": "Many Regent cards CREATE cards (often random Colorless). Creation payoffs reward that with Block and Strength, and finishers scale off how many cards you've made.",
+        "cards": [
+          "Pillar of Creation — gain Block whenever you create a card",
+          "Bundle of Joy — add random Colorless cards to your hand",
+          "Genesis-style creation powers — Strength/Block per card created",
+          "Finishers that deal bonus damage for each card created this combat"
+        ],
+        "relics": [
+          "Regalite — whenever you create a card, gain Block (turns creation into a defense engine)",
+          "Fresnel Lens — auto-enchant the Block-gaining cards you add to your deck"
+        ],
+        "combos": [
+          "Regalite + Pillar of Creation + any card-generator = passive Block every turn",
+          "Pairs with Forge or Light as the actual damage; creation is the multiplier"
+        ],
+        "pitfalls": "Creating random cards dilutes your deck — it's an engine, not a wincon. Anchor it to Forge or Light."
+      }
+    ]
+  },
+  "CHARACTER.NECROBINDER": {
+    "name": "Necrobinder",
+    "archetypes": [
+      {
+        "name": "Osty / Summon (minion beatdown)",
+        "summary": "Summon Osty, a persistent minion with his own Max HP that attacks the enemy. Buff and command him so he does the killing, and sacrifice him for a huge payoff when needed.",
+        "cards": [
+          "Reanimate — Summon Osty",
+          "Osty attack cards — 'Osty deals X damage' (your main damage; many of these)",
+          "Right Hand Hand — Osty attack that returns to your hand cheaply (recurring)",
+          "Buffs — 'Osty's attacks deal additional damage' / extra attacks",
+          "Sacrifice — if Osty is alive, he dies and you gain Block equal to double his Max HP (panic button)"
+        ],
+        "relics": [
+          "Bone Flute — whenever Osty attacks, gain Block (defense off your offense)",
+          "Bound Phylactery — Summon at the start of your turn",
+          "Phylactery Unbound — Summon at combat start AND each turn (upgraded engine)"
+        ],
+        "combos": [
+          "Phylactery Unbound + Osty buffs = a minion that hits hard from turn 1, free",
+          "Bone Flute makes every Osty swing also build your Block",
+          "Sacrifice for a massive Block wall on a dangerous boss turn"
+        ],
+        "pitfalls": "No Osty = most of your deck is dead cards. Protect/re-summon him, and don't Sacrifice unless the Block swing is worth losing your engine."
+      },
+      {
+        "name": "Doom (execute / damage-over-time)",
+        "summary": "Stack Doom on enemies; it builds toward an execute. End of Days kills anything whose Doom meets its HP. Apply Doom fast and convert it to Block and survival along the way.",
+        "cards": [
+          "Deathbringer — apply Doom and Weak to ALL enemies",
+          "Defile-style — apply Doom, plus extra Doom for each Doom already there (snowball)",
+          "Attack-into-Doom — 'whenever Attacks deal damage, also apply that much Doom'",
+          "End of Days — apply Doom to ALL enemies and kill any with Doom >= HP (finisher)",
+          "Doom-to-Block — 'whenever you apply Doom, gain Block'"
+        ],
+        "relics": [
+          "Undying Sigil — enemies with Doom >= HP deal 50% less damage (survive the ramp)",
+          "Book Repair Knife — heal HP when an enemy dies to Doom",
+          "Red Mask — start combat applying Weak to ALL (buys ramp time)"
+        ],
+        "combos": [
+          "Attack-applies-Doom + many small hits = Doom ramps every attack",
+          "Stack Doom across the room, then End of Days for a mass execute",
+          "Undying Sigil makes the doomed enemies harmless while you wait for the kill"
+        ],
+        "pitfalls": "Doom needs time to reach lethal — survival-dependent vs fast fights. Spread too thin across many enemies and nothing dies."
+      },
+      {
+        "name": "Soul & Ethereal (engine)",
+        "summary": "Generate Souls (special cards) and Ethereal cards (exhaust if unplayed). Playing Souls triggers summons and enemy HP loss; Ethereal payoffs reward the churn. The glue for the Osty and Doom plans.",
+        "cards": [
+          "Soul generators — cards that add Souls to your draw/hand/discard",
+          "Soul payoffs — 'whenever you play a Soul, Summon' / 'a random enemy loses HP'",
+          "Spirit of Ash — gain Block whenever you play an Ethereal card",
+          "Ethereal draw — 'whenever you draw an Ethereal card, draw more'",
+          "Eidolon — Exhaust your hand; if 9 cards exhaust, gain Intangible"
+        ],
+        "relics": [
+          "Music Box — create an Ethereal copy of the first Attack you play each turn",
+          "(few Soul/Ethereal-specific relics confirmed — lean on draw/retain relics to keep the churn going)"
+        ],
+        "combos": [
+          "Soul payoff + a Soul-generation engine = free Summons / chip damage every turn",
+          "Ethereal payoffs (Spirit of Ash) turn the natural churn into Block"
+        ],
+        "pitfalls": "Souls/Ethereal are fuel, not a kill on their own — pair with Osty or Doom. Ethereal cards vanish if unplayed, so build around the churn, not against it."
+      }
+    ]
+  }
+}

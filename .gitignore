@@ -1,0 +1,8 @@
+# local save backups (personal run data - never commit)
+backups/
+
+# scratch / temp files
+_*.save
+_loc.txt
+*.tmp
+*.bak
