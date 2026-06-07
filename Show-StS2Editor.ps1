@@ -201,7 +201,7 @@ function Test-GameRunning {
 # ---- form ----------------------------------------------------------------
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "StS2 Save Editor"
-$form.Size = New-Object System.Drawing.Size(440, 800)
+$form.Size = New-Object System.Drawing.Size(440, 820)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
@@ -228,6 +228,14 @@ $lblWarn = New-Label "" 10 $y 410
 $lblWarn.ForeColor = [System.Drawing.Color]::Firebrick
 $lblWarn.Font = New-Object System.Drawing.Font($lblWarn.Font, [System.Drawing.FontStyle]::Bold)
 $y += 22
+
+# Update-available notice (hidden until a newer release is found)
+$llUpdate = New-Object System.Windows.Forms.LinkLabel
+$llUpdate.Left = 10; $llUpdate.Top = $y; $llUpdate.Width = 410; $llUpdate.Height = 18; $llUpdate.AutoSize = $false
+$llUpdate.Visible = $false
+$llUpdate.Add_LinkClicked({ Start-Process $STS2_RELEASES_URL })
+$form.Controls.Add($llUpdate)
+$y += 20
 
 $lblChar = New-Label "" 10 $y 300
 $btnRefresh = New-Button "Refresh IDs" 315 ($y-2) 105
@@ -709,4 +717,18 @@ $btnApply.Add_Click({
 $found = Load-Save
 Set-RunState $found
 Set-Warnings
+
+# Check for a newer release ~0.4s after the window shows (keeps launch instant).
+$updTimer = New-Object System.Windows.Forms.Timer
+$updTimer.Interval = 400
+$updTimer.Add_Tick({
+    $updTimer.Stop()
+    $tag = Get-UpdateTag
+    if ($tag) {
+        $llUpdate.Text = "Update available: $tag (you have $STS2_TOOL_VERSION) - click to download"
+        $llUpdate.Visible = $true
+    }
+})
+$form.Add_Shown({ $updTimer.Start() })
+
 [void]$form.ShowDialog()

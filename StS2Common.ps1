@@ -5,6 +5,22 @@
 
 $Global:STS2_APPID        = '2868840'
 $Global:STS2_KNOWN_SCHEMA = 16   # save schema this editor was built/tested against
+$Global:STS2_TOOL_VERSION = 'v1.0.0'                # bump this with each release tag
+$Global:STS2_REPO         = 'Kelevrust/sts2-save-editor'
+$Global:STS2_RELEASES_URL = "https://github.com/$STS2_REPO/releases/latest"
+
+# Best-effort update check: returns the latest release tag if it's NEWER than
+# this build, else $null. Sends nothing; fails silently offline.
+function Get-UpdateTag {
+    try {
+        $r = Invoke-RestMethod -Uri "https://api.github.com/repos/$STS2_REPO/releases/latest" `
+             -Headers @{ 'User-Agent' = 'sts2-save-editor' } -TimeoutSec 4 -ErrorAction Stop
+        $latest = "$($r.tag_name)"
+        if (-not $latest) { return $null }
+        if ([version]($latest.TrimStart('v')) -gt [version]($STS2_TOOL_VERSION.TrimStart('v'))) { return $latest }
+    } catch { }
+    return $null
+}
 
 # --- Steam install root (registry, then common fallbacks) -----------------
 function Find-SteamRoot {

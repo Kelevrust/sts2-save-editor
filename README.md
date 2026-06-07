@@ -77,6 +77,7 @@ If an edit ever "doesn't work," Steam Cloud is still on somewhere.
   game files (accurate), but the build groupings and "go-to" picks are my judgment, not a
   scraped tier list. It's a plain `builds.json` file — edit it however you like.
 - **Multiplayer saves are untested** — the editor flags them but isn't built for co-op.
+- **Update check:** on launch it asks GitHub whether a newer release exists and, if so, shows a "download" link. It **sends nothing** about you and never auto-updates — you decide whether to grab it. Offline? It silently skips.
 
 ## What's in the folder
 
