@@ -22,7 +22,9 @@ Add-Type -AssemblyName System.Drawing
 
 # ---- shared state --------------------------------------------------------
 # Auto-detect the active run save unless one was passed in.
-if (-not $SavePath) { $SavePath = Find-Sts2Save -Prompt }
+# NOTE: no -Prompt here on purpose - never throw a confusing file dialog at a
+# new user. If there's no run, the editor opens in a friendly "no run" state.
+if (-not $SavePath) { $SavePath = Find-Sts2Save }
 $script:SavePath = $SavePath
 $script:save     = $null   # whole deserialized save
 $script:p        = $null   # players[0] shortcut
@@ -132,10 +134,8 @@ function Resolve-ComboId($combo, $prefix) {
 
 function Load-Save {
     if (-not $script:SavePath -or -not (Test-Path -LiteralPath $script:SavePath)) {
-        [System.Windows.Forms.MessageBox]::Show(
-            "No active run found (current_run.save).`n`nStart a run in Slay the Spire 2 first - the file appears once you're in a run - then reopen the editor.",
-            "No active run", 'OK', 'Information') | Out-Null
-        return $false
+        $script:save = $null; $script:p = $null; $script:schema = $null
+        return $false   # caller puts the UI into the friendly "no run" state
     }
     $script:save   = (Get-Content -LiteralPath $script:SavePath -Raw -Encoding UTF8) | ConvertFrom-Json
     $script:p      = $script:save.players[0]
@@ -159,6 +159,38 @@ function Refresh-Fields {
         $lstDeck.Items.Add("$($c.id)$up") | Out-Null
     }
     $lblStatus.Text = "Loaded. deck: $($script:p.deck.Count) cards | relics: $($script:p.relics.Count) | potions: $($script:p.potions.Count)/$($script:p.max_potion_slot_count)"
+}
+
+# Enable/disable the run-editing controls and show the right message.
+# Builds always works (no run needed); editing only when a run is loaded.
+function Set-RunState($hasRun) {
+    $editCtrls = @(
+        $tbGold,$tbCur,$tbMax,$tbAsc,$btnHeal,
+        $cbAddRelic,$btnAddRelic,$btnDelRelic,
+        $cbAddPotion,$btnAddPotion,$btnDelPotion,
+        $cbAddCard,$chkUpg,$btnAddCard,$btnDelCard,
+        $btnApply,$btnAhead
+    )
+    foreach ($c in $editCtrls) { $c.Enabled = $hasRun }
+    if ($hasRun) {
+        Refresh-Fields
+    } else {
+        $lblChar.Text = "No active run loaded"
+        $tbGold.Text=''; $tbCur.Text=''; $tbMax.Text=''; $tbAsc.Text=''
+        $lstRelics.Items.Clear(); $lstPotions.Items.Clear(); $lstDeck.Items.Clear()
+        $lblStatus.Text = "No run found. Start a run in StS2 (just enter Act 1), then click Reload. You can still browse Builds."
+    }
+}
+
+# Build the warning banner (game running / schema / multiplayer).
+function Set-Warnings {
+    $warn = @()
+    if (Test-GameRunning) { $warn += "StS2 is running - quit first (Steam Cloud will overwrite)." }
+    if ($script:save) {
+        if ($script:schema -ne $STS2_KNOWN_SCHEMA) { $warn += "Save schema $($script:schema) != tested $STS2_KNOWN_SCHEMA - edits risky." }
+        if ($script:save.players.Count -gt 1) { $warn += "Multiplayer save ($($script:save.players.Count) players) - editing untested." }
+    }
+    $lblWarn.Text = ($warn -join "  |  ")
 }
 
 function Test-GameRunning {
@@ -278,9 +310,10 @@ $btnAddCard = New-Button "Add" 265 ($y-1) 70
 $btnDelCard = New-Button "Remove" 340 ($y-1) 80
 $y += 40
 
-# Info buttons (read-only views)
+# Info / utility buttons
 $btnAhead  = New-Button "What's Ahead" 10 $y 130
-$btnBuilds = New-Button "Builds"      150 $y 130
+$btnBuilds = New-Button "Builds"      150 $y 95
+$btnFind   = New-Button "Find save..." 250 $y 90   # opt-in manual locate (auto-detect fallback)
 $y += 32
 
 # Action buttons
@@ -517,9 +550,22 @@ $btnAhead.Add_Click({
     [void]$dlg.ShowDialog()
 })
 
-# ---- reload / apply / close ---------------------------------------------
+# ---- reload / find / apply / close --------------------------------------
 $btnReload.Add_Click({
-    if (Load-Save) { Refresh-Fields }
+    $script:SavePath = Find-Sts2Save     # re-detect: picks up a run you just started
+    $found = Load-Save
+    Set-RunState $found
+    Set-Warnings
+    if (-not $found) { $lblStatus.Text = "Still no run found. Start one in StS2 (enter Act 1), then click Reload again." }
+})
+$btnFind.Add_Click({
+    # opt-in manual locate, for the rare case auto-detect misses the save
+    $picked = Find-Sts2Save -Prompt
+    if (-not $picked -or -not (Test-Path -LiteralPath $picked)) { return }  # cancelled
+    $script:SavePath = $picked
+    $found = Load-Save
+    Set-RunState $found
+    Set-Warnings
 })
 $btnClose.Add_Click({ $form.Close() })
 
@@ -573,12 +619,9 @@ $btnApply.Add_Click({
 })
 
 # ---- boot ----------------------------------------------------------------
-if (Load-Save) {
-    Refresh-Fields
-    $warn = @()
-    if (Test-GameRunning) { $warn += "StS2 is running - quit first (Steam Cloud will overwrite)." }
-    if ($script:schema -ne $STS2_KNOWN_SCHEMA) { $warn += "Save schema $($script:schema) != tested $STS2_KNOWN_SCHEMA - edits risky." }
-    if ($script:save.players.Count -gt 1) { $warn += "Multiplayer save ($($script:save.players.Count) players) - editing untested." }
-    $lblWarn.Text = ($warn -join "  |  ")
-    [void]$form.ShowDialog()
-}
+# Always open the window. With a run -> editing enabled. Without -> friendly
+# "no run" state, Builds still browsable, Reload to pick up a new run.
+$found = Load-Save
+Set-RunState $found
+Set-Warnings
+[void]$form.ShowDialog()
