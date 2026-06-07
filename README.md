@@ -39,6 +39,12 @@ This trips up almost everyone. Steam re-downloads its cloud copy over your edit,
 
 If an edit ever "doesn't work," Steam Cloud is still on somewhere.
 
+> **Got more than one PC?** Edit on the machine that has the run you actually want, and
+> keep Cloud off while you do it. If you edit an older local run and later turn Cloud back
+> on (or launch the game on another PC), Steam may show a **Cloud Conflict** — choose the
+> version you just edited, or you could overwrite a newer run. Safest: do all your editing
+> in one place.
+
 ## What it does
 
 - **Edit your current run** — gold, current/max HP (with Full Heal), ascension.
