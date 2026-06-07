@@ -49,6 +49,7 @@ If an edit ever "doesn't work," Steam Cloud is still on somewhere.
 ## What it does
 
 - **Edit your current run** — gold, current/max HP (with Full Heal), ascension.
+- **Reshuffle** — bad opening draw? Bump the shuffle and relaunch to restart that fight with a new hand (it's a blind reroll — you see the new draw when you re-enter, not before).
 - **Add or remove relics, potions, and cards** from searchable dropdowns containing
   *every* item in the game (auto-pulled from the game files), with friendly names and an
   "upgraded" toggle for cards.

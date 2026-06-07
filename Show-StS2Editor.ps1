@@ -149,6 +149,9 @@ function Refresh-Fields {
     $tbCur.Text    = "$($script:p.current_hp)"
     $tbMax.Text    = "$($script:p.max_hp)"
     $tbAsc.Text    = "$($script:save.ascension)"
+    $v = [int64]$script:save.rng.counters.shuffle
+    if ($v -lt 0) { $v = 0 } elseif ($v -gt 2147483647) { $v = 2147483647 }
+    $nudShuffle.Value = [decimal]$v
     $lstRelics.Items.Clear()
     foreach ($r in $script:p.relics) { $lstRelics.Items.Add($r.id) | Out-Null }
     $lstPotions.Items.Clear()
@@ -165,7 +168,7 @@ function Refresh-Fields {
 # Builds always works (no run needed); editing only when a run is loaded.
 function Set-RunState($hasRun) {
     $editCtrls = @(
-        $tbGold,$tbCur,$tbMax,$tbAsc,$btnHeal,
+        $tbGold,$tbCur,$tbMax,$tbAsc,$btnHeal,$nudShuffle,$btnReshuffle,
         $cbAddRelic,$btnAddRelic,$btnDelRelic,
         $cbAddPotion,$btnAddPotion,$btnDelPotion,
         $cbAddCard,$chkUpg,$btnAddCard,$btnDelCard,
@@ -201,7 +204,7 @@ function Test-GameRunning {
 # ---- form ----------------------------------------------------------------
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "StS2 Save Editor"
-$form.Size = New-Object System.Drawing.Size(440, 820)
+$form.Size = New-Object System.Drawing.Size(440, 854)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
@@ -253,7 +256,18 @@ New-Label "Max HP"        210 ($y+3) 70 | Out-Null
 $tbMax  = New-Text 285 $y 60
 $btnHeal = New-Button "Full Heal" 355 ($y-1) 65
 $btnHeal.Add_Click({ $tbCur.Text = $tbMax.Text })
-$y += 36
+$y += 30
+
+# Reshuffle: bump the shuffle RNG counter, then relaunch for a fresh draw on that fight.
+New-Label "Shuffle" 10 ($y+3) 55 | Out-Null
+$nudShuffle = New-Object System.Windows.Forms.NumericUpDown
+$nudShuffle.SetBounds(68, $y, 72, 24)
+$nudShuffle.Minimum = 0; $nudShuffle.Maximum = [decimal]2147483647; $nudShuffle.Increment = 1
+$form.Controls.Add($nudShuffle)
+$btnReshuffle = New-Button "Reshuffle" 148 ($y-1) 95
+$lblShuf = New-Label "quit game first, then relaunch" 250 ($y+3) 175
+$lblShuf.ForeColor = [System.Drawing.Color]::Gray
+$y += 34
 
 # Relics
 New-Label "Relics" 10 $y 200 | Out-Null
@@ -669,6 +683,7 @@ $btnApply.Add_Click({
     if (-not [int]::TryParse($tbCur.Text,[ref]$c))  { $lblStatus.Text="Current HP must be a number."; return }
     if (-not [int]::TryParse($tbMax.Text,[ref]$m))  { $lblStatus.Text="Max HP must be a number."; return }
     if (-not [int]::TryParse($tbAsc.Text,[ref]$a))  { $lblStatus.Text="Ascension must be a number."; return }
+    $sh = [int]$nudShuffle.Value
 
     if ($script:schema -ne $STS2_KNOWN_SCHEMA) {
         $r = [System.Windows.Forms.MessageBox]::Show(
@@ -690,6 +705,7 @@ $btnApply.Add_Click({
     $script:p.current_hp = $c
     $script:p.max_hp     = $m
     $script:save.ascension = $a
+    $script:save.rng.counters.shuffle = $sh
 
     # backup
     try {
@@ -709,6 +725,14 @@ $btnApply.Add_Click({
     } catch {
         $lblStatus.Text = "Save failed: $($_.Exception.Message)"
     }
+})
+
+# ---- reshuffle ----------------------------------------------------------
+$btnReshuffle.Add_Click({
+    if (-not $script:save) { $lblStatus.Text = "No run loaded."; return }
+    $nudShuffle.Value = [Math]::Min([decimal]$nudShuffle.Maximum, $nudShuffle.Value + 1)
+    $btnApply.PerformClick()   # saves the bumped shuffle (backup + game-running warning)
+    if ($lblStatus.Text -like 'Saved*') { $lblStatus.Text = "Reshuffled. Relaunch the game for a new draw on that fight." }
 })
 
 # ---- boot ----------------------------------------------------------------
