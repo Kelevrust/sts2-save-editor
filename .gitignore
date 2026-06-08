@@ -12,3 +12,6 @@ crash-log.txt
 
 # per-save edit stamps for last-writer detection (local state)
 .last-edits.json
+
+# editor UI preferences (local state)
+.editor-prefs.json

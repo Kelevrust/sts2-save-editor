@@ -133,6 +133,44 @@ function Get-LastWriterWarning {
     return "This save changed since your last edit - something rewrote it (a played turn, or Steam Cloud). Re-check before relying on your edits."
 }
 
+# ---- editor prefs (tiny key/value store next to the editor) -------------
+$script:PrefsPath = Join-Path $PSScriptRoot '.editor-prefs.json'
+function Get-Pref($key, $default) {
+    if (-not (Test-Path -LiteralPath $script:PrefsPath)) { return $default }
+    try {
+        $obj = Get-Content -LiteralPath $script:PrefsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $p = $obj.PSObject.Properties[$key]
+        if ($p) { return $p.Value }
+    } catch {}
+    return $default
+}
+function Set-Pref($key, $value) {
+    $prefs = @{}
+    if (Test-Path -LiteralPath $script:PrefsPath) {
+        try { (Get-Content -LiteralPath $script:PrefsPath -Raw -Encoding UTF8 | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $prefs[$_.Name] = $_.Value } } catch {}
+    }
+    $prefs[$key] = $value
+    try { ($prefs | ConvertTo-Json) | Set-Content -LiteralPath $script:PrefsPath -Encoding UTF8 } catch {}
+}
+# Drawer docking. Each drawer (Builds, Map) picks a slot: a side (left/right) and
+# a position (near = adjacent to the editor, far = beyond the near one), or floats
+# free. Set-DrawerPosition reads both and stacks same-side drawers outward.
+$script:DOCK_OPTS   = @('left-near','left-far','right-near','right-far','float')
+$script:DOCK_LABELS = [ordered]@{
+    'left-near'  = 'Left (near)';  'left-far'  = 'Left (far)'
+    'right-near' = 'Right (near)'; 'right-far' = 'Right (far)'; 'float' = 'Float'
+}
+function ConvertTo-DockToken($label) {
+    foreach ($k in $script:DOCK_LABELS.Keys) { if ($script:DOCK_LABELS[$k] -eq $label) { return $k } }
+    return 'float'
+}
+function Get-DockPref($key, $default) {
+    $v = "$(Get-Pref $key $default)".ToLower()
+    if ($v -in $script:DOCK_OPTS) { return $v } else { return $default }
+}
+$script:mapDock    = Get-DockPref 'mapDock'    'left-near'
+$script:buildsDock = Get-DockPref 'buildsDock' 'right-near'
+
 # ---- shared state --------------------------------------------------------
 # Auto-detect the active run save unless one was passed in.
 # NOTE: no -Prompt here on purpose - never throw a confusing file dialog at a
@@ -582,19 +620,37 @@ function Format-Archetype($a) {
     return $sb.ToString()
 }
 
-# Keep the drawers pinned to the editor: Builds on the right, Run Map on the
-# left, both matching the editor's height so they read as attached panels.
+# Lay out the docked drawers around the editor. Each drawer picks a slot
+# (left/right x near/far) or floats; same-side drawers stack outward from the
+# editor, near first, and match its height so they read as attached panels.
 function Set-DrawerPosition {
-    if ($script:buildsWin -and -not $script:buildsWin.IsDisposed) {
-        $script:buildsWin.Location = New-Object System.Drawing.Point(($form.Location.X + $form.Width), $form.Location.Y)
-        $script:buildsWin.Height   = $form.Height
-    }
-    if ($script:mapWin -and -not $script:mapWin.IsDisposed) {
-        $wa = [System.Windows.Forms.Screen]::FromControl($form).WorkingArea
-        $x  = $form.Location.X - $script:mapWin.Width
-        if ($x -lt $wa.Left) { $x = $wa.Left }   # keep on-screen if editor hugs the left edge
-        $script:mapWin.Location = New-Object System.Drawing.Point($x, $form.Location.Y)
-        $script:mapWin.Height   = $form.Height
+    $wa = [System.Windows.Forms.Screen]::FromControl($form).WorkingArea
+    $drawers = @()
+    if ($script:buildsWin -and -not $script:buildsWin.IsDisposed) { $drawers += [pscustomobject]@{ Win = $script:buildsWin; Dock = $script:buildsDock; Name = 'builds' } }
+    if ($script:mapWin    -and -not $script:mapWin.IsDisposed)    { $drawers += [pscustomobject]@{ Win = $script:mapWin;    Dock = $script:mapDock;    Name = 'map' } }
+    foreach ($side in 'left','right') {
+        $onSide = @($drawers | Where-Object { $_.Dock -eq "$side-near" -or $_.Dock -eq "$side-far" } |
+                    Sort-Object @{ Expression = { if ($_.Dock -like '*-near') { 0 } else { 1 } } }, Name)
+        if (-not $onSide.Count) { continue }
+        if ($side -eq 'left') {
+            $edge = $form.Location.X                       # near drawer's right edge meets the editor
+            foreach ($d in $onSide) {
+                $x = $edge - $d.Win.Width
+                if ($x -lt $wa.Left) { $x = $wa.Left }     # keep on-screen
+                $d.Win.Location = New-Object System.Drawing.Point($x, $form.Location.Y)
+                $d.Win.Height   = $form.Height
+                $edge = $x                                 # next one stacks further left
+            }
+        } else {
+            $edge = $form.Location.X + $form.Width         # near drawer's left edge meets the editor
+            foreach ($d in $onSide) {
+                $maxX = $wa.Right - $d.Win.Width
+                $x = if ($edge -gt $maxX) { $maxX } else { $edge }
+                $d.Win.Location = New-Object System.Drawing.Point($x, $form.Location.Y)
+                $d.Win.Height   = $form.Height
+                $edge = $x + $d.Win.Width                  # next one stacks further right
+            }
+        }
     }
 }
 $form.Add_Move({   Set-DrawerPosition })
@@ -607,7 +663,7 @@ $btnBuilds.Add_Click({
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = "Build Cheatsheet"
     $dlg.FormBorderStyle = 'SizableToolWindow'
-    $dlg.StartPosition = 'Manual'
+    $dlg.StartPosition = if ($script:buildsDock -eq 'float') { 'CenterScreen' } else { 'Manual' }
     $dlg.ShowInTaskbar = $false
     $dlg.ClientSize = New-Object System.Drawing.Size(464, 600)
 
@@ -621,10 +677,22 @@ $btnBuilds.Add_Click({
     $script:dBuild.SetBounds(8, 38, 448, 24); $script:dBuild.DropDownStyle = 'DropDownList'
     $script:dBuild.Anchor = $A::Top -bor $A::Left -bor $A::Right
     $script:dText = New-Object System.Windows.Forms.TextBox
-    $script:dText.SetBounds(8, 70, 448, 522)
+    $script:dText.SetBounds(8, 70, 448, 482)
     $script:dText.Multiline=$true; $script:dText.ReadOnly=$true; $script:dText.ScrollBars='Vertical'; $script:dText.WordWrap=$true
     $script:dText.Font = New-Object System.Drawing.Font("Consolas", 9)
     $script:dText.Anchor = $A::Top -bor $A::Bottom -bor $A::Left -bor $A::Right
+    # dock chooser (bottom-anchored so it tracks the window edge on resize)
+    $dockLbl = New-Object System.Windows.Forms.Label
+    $dockLbl.Text = 'Dock:'; $dockLbl.SetBounds(8, 560, 36, 22); $dockLbl.Anchor = $A::Bottom -bor $A::Left
+    $script:buildsDockCombo = New-Object System.Windows.Forms.ComboBox
+    $script:buildsDockCombo.DropDownStyle = 'DropDownList'; $script:buildsDockCombo.SetBounds(46, 557, 140, 24); $script:buildsDockCombo.Anchor = $A::Bottom -bor $A::Left
+    foreach ($lab in $script:DOCK_LABELS.Values) { [void]$script:buildsDockCombo.Items.Add($lab) }
+    $script:buildsDockCombo.SelectedItem = $script:DOCK_LABELS[$script:buildsDock]
+    $script:buildsDockCombo.Add_SelectedIndexChanged({
+        $script:buildsDock = ConvertTo-DockToken "$($script:buildsDockCombo.SelectedItem)"
+        Set-Pref 'buildsDock' $script:buildsDock
+        Set-DrawerPosition
+    })
 
     foreach ($prop in $script:builds.PSObject.Properties) {
         if ($prop.Name -like 'CHARACTER.*') {
@@ -656,7 +724,7 @@ $btnBuilds.Add_Click({
         }
     })
 
-    $dlg.Controls.AddRange(@($script:dChar, $script:dBuild, $script:dText))
+    $dlg.Controls.AddRange(@($script:dChar, $script:dBuild, $script:dText, $dockLbl, $script:buildsDockCombo))
     $script:buildsWin = $dlg
     $dlg.Add_FormClosed({ $script:buildsWin = $null })
 
@@ -849,7 +917,8 @@ $btnMap.Add_Click({
 
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = "Run Map  (seed $($script:save.rng.seed))"
-    $dlg.Size = New-Object System.Drawing.Size(520, 660); $dlg.StartPosition = "Manual"
+    $dlg.Size = New-Object System.Drawing.Size(520, 660)
+    $dlg.StartPosition = if ($script:mapDock -eq 'float') { 'CenterScreen' } else { 'Manual' }
     $dlg.FormBorderStyle = 'SizableToolWindow'
     $dlg.ShowInTaskbar = $false
     # script-scoped so the toolbar handlers still resolve them after this
@@ -858,22 +927,32 @@ $btnMap.Add_Click({
     $script:mapTb.Multiline=$true; $script:mapTb.ReadOnly=$true; $script:mapTb.ScrollBars='Vertical'; $script:mapTb.Dock='Fill'
     $script:mapTb.Font = New-Object System.Drawing.Font("Consolas", 9); $script:mapTb.Text = ($ascii -replace "`n","`r`n")
     $bar = New-Object System.Windows.Forms.Panel; $bar.Dock='Bottom'; $bar.Height=40
-    $bExp  = New-Object System.Windows.Forms.Button; $bExp.Text='Export .md';        $bExp.SetBounds(8,8,100,26)
-    $bLink = New-Object System.Windows.Forms.Button; $bLink.Text='Copy render link';  $bLink.SetBounds(114,8,130,26)
-    $script:mapLbl = New-Object System.Windows.Forms.Label; $script:mapLbl.SetBounds(250,12,250,22)
+    $bExp  = New-Object System.Windows.Forms.Button; $bExp.Text='Export .md'; $bExp.SetBounds(8,8,96,26)
+    $bLink = New-Object System.Windows.Forms.Button; $bLink.Text='Copy link'; $bLink.SetBounds(108,8,96,26)
+    $script:mapLbl = New-Object System.Windows.Forms.Label; $script:mapLbl.SetBounds(208,12,150,22)
+    $dockLbl = New-Object System.Windows.Forms.Label; $dockLbl.Text='Dock:'; $dockLbl.SetBounds(360,12,36,22)
+    $script:mapDockCombo = New-Object System.Windows.Forms.ComboBox
+    $script:mapDockCombo.DropDownStyle = 'DropDownList'; $script:mapDockCombo.SetBounds(396,8,106,24)
+    foreach ($lab in $script:DOCK_LABELS.Values) { [void]$script:mapDockCombo.Items.Add($lab) }
+    $script:mapDockCombo.SelectedItem = $script:DOCK_LABELS[$script:mapDock]
+    $script:mapDockCombo.Add_SelectedIndexChanged({
+        $script:mapDock = ConvertTo-DockToken "$($script:mapDockCombo.SelectedItem)"
+        Set-Pref 'mapDock' $script:mapDock
+        Set-DrawerPosition          # re-pin immediately (no-op for 'float')
+    })
     $bExp.Add_Click({
         $fence = [string][char]96 * 3
         $md = "# StS2 Run Map`r`n`r`nPaste the block below at https://kelevrust.github.io/sts2-save-editor/map.html (or https://mermaid.live) to view/download it.`r`n`r`n${fence}mermaid`r`n$($script:mapMermaid)`r`n${fence}`r`n"
         $p = Join-Path ([Environment]::GetFolderPath('Desktop')) 'StS2-run-map.md'
         [System.IO.File]::WriteAllText($p, $md, [System.Text.UTF8Encoding]::new($false))
-        $script:mapLbl.Text = "Saved -> Desktop\StS2-run-map.md"
+        $script:mapLbl.Text = "Saved to Desktop"
     })
     $bLink.Add_Click({
         $b = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($script:mapMermaid)) -replace '\+','-' -replace '/','_' -replace '=',''
         [System.Windows.Forms.Clipboard]::SetText("https://kelevrust.github.io/sts2-save-editor/map.html#m=$b")
-        $script:mapLbl.Text = "Render link copied to clipboard"
+        $script:mapLbl.Text = "Link copied"
     })
-    $bar.Controls.AddRange(@($bExp,$bLink,$script:mapLbl))
+    $bar.Controls.AddRange(@($bExp,$bLink,$script:mapLbl,$dockLbl,$script:mapDockCombo))
     $dlg.Controls.Add($script:mapTb); $dlg.Controls.Add($bar)
     $script:mapWin = $dlg
     $dlg.Add_FormClosed({ $script:mapWin = $null })
