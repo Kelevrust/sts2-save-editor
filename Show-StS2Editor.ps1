@@ -172,7 +172,7 @@ function Set-RunState($hasRun) {
         $cbAddRelic,$btnAddRelic,$btnDelRelic,
         $cbAddPotion,$btnAddPotion,$btnDelPotion,
         $cbAddCard,$chkUpg,$btnAddCard,$btnDelCard,
-        $btnApply,$btnAhead,$btnMap
+        $btnApply,$btnMap
     )
     foreach ($c in $editCtrls) { $c.Enabled = $hasRun }
     if ($hasRun) {
@@ -337,10 +337,9 @@ $btnDelCard = New-Button "Remove" 340 ($y-1) 80
 $y += 40
 
 # Info / utility buttons
-$btnAhead  = New-Button "What's Ahead" 10 $y 100
-$btnMap    = New-Button "Run Map"     115 $y 78
-$btnBuilds = New-Button "Builds"      198 $y 62
-$btnFind   = New-Button "Find..."     265 $y 62   # opt-in manual locate (auto-detect fallback)
+$btnMap    = New-Button "Run Map"      10 $y 100
+$btnBuilds = New-Button "Builds"      115 $y 62
+$btnFind   = New-Button "Find..."     182 $y 62   # opt-in manual locate (auto-detect fallback)
 $y += 32
 
 # Action buttons
@@ -544,12 +543,12 @@ $btnBuilds.Add_Click({
     if ($script:dChar.Items.Count) { $script:dChar.SelectedIndex = $idx }
 })
 
-# ---- "what's ahead" reader ---------------------------------------------
-$btnAhead.Add_Click({
+# ---- upcoming queues (what's in the RNG pools per act) ------------------
+function Format-WhatAhead($save) {
     $sb = New-Object System.Text.StringBuilder
-    $ai = [int]$script:save.current_act_index
-    for ($k = $ai; $k -lt $script:save.acts.Count; $k++) {
-        $act = $script:save.acts[$k]; $r = $act.rooms
+    $ai = [int]$save.current_act_index
+    for ($k = $ai; $k -lt $save.acts.Count; $k++) {
+        $act = $save.acts[$k]; $r = $act.rooms
         $tag = if ($k -eq $ai) { " (current)" } else { "" }
         [void]$sb.AppendLine("=== $($act.id)$tag ===")
         foreach ($trip in @(
@@ -557,7 +556,7 @@ $btnAhead.Add_Click({
             @('elite_encounter_ids','elite_encounters_visited','Elites'),
             @('event_ids','events_visited','? events'))) {
             $ids = $r.($trip[0]); $v = [int]$r.($trip[1])
-            $remaining = if ($k -eq $ai) { $v } else { 0 }   # only the current act has progress
+            $remaining = if ($k -eq $ai) { $v } else { 0 }   # only current act has progress
             $upcoming = @($ids | Select-Object -Skip $remaining | Select-Object -First 8)
             [void]$sb.AppendLine("  $($trip[2]) (next, in visit order):")
             foreach ($x in $upcoming) { [void]$sb.AppendLine("     $($x -replace '^ENCOUNTER\.|^EVENT\.','')") }
@@ -565,17 +564,8 @@ $btnAhead.Add_Click({
         [void]$sb.AppendLine("  BOSS: $($r.boss_id -replace '^ENCOUNTER\.','')")
         [void]$sb.AppendLine("")
     }
-    $dlg = New-Object System.Windows.Forms.Form
-    $dlg.Text = "What's Ahead  (seed $($script:save.rng.seed))"
-    $dlg.Size = New-Object System.Drawing.Size(480, 620)
-    $dlg.StartPosition = "CenterParent"
-    $tb = New-Object System.Windows.Forms.TextBox
-    $tb.Multiline = $true; $tb.ReadOnly = $true; $tb.ScrollBars = 'Vertical'
-    $tb.Dock = 'Fill'; $tb.Font = New-Object System.Drawing.Font("Consolas", 9)
-    $tb.Text = $sb.ToString()
-    $dlg.Controls.Add($tb)
-    [void]$dlg.ShowDialog()
-})
+    return $sb.ToString()
+}
 
 # ---- run map (ASCII + Mermaid export) -----------------------------------
 $Global:STS2_SYM = @{ monster='M'; elite='E'; event='?'; ancient='N'; shop='$'; rest_site='R'; treasure='T'; boss='B' }
@@ -706,7 +696,8 @@ function Format-RunMapGraphMermaid($save) {
 }
 $btnMap.Add_Click({
     if (-not $script:save) { $lblStatus.Text = "No run loaded."; return }
-    $ascii   = (Format-RunMapGraph $script:save) + "`r`n`r`n" + (Format-RunMap $script:save)
+    $div   = "`r`n" + ('-' * 52) + "`r`n`r`n"
+    $ascii = (Format-RunMapGraph $script:save) + $div + (Format-WhatAhead $script:save) + $div + (Format-RunMap $script:save)
     $mermaid = Format-RunMapGraphMermaid $script:save
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = "Run Map  (seed $($script:save.rng.seed))"
