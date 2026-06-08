@@ -660,13 +660,11 @@ function Format-RunMapGraph($save) {
             $cl = (' ' * ($w*4)).ToCharArray()
             for ($c=0; $c -lt $w; $c++) {
                 $n = $grid["$c,$r"]; if (-not $n) { continue }
-                $aV = [bool]$vis["$c,$r"]
                 foreach ($ch in $n.children) {
-                    $cc = [int]$ch.col; $bV = [bool]$vis["$cc,$($r+1)"]; $onPath = $aV -and $bV
-                    $dc = $cc - $c; $b = $c*4
-                    if     ($dc -eq 0) { $e = if ($onPath) {'|'} else {'.'}; $cl[$b+1]=[char]$e }
-                    elseif ($dc -gt 0) { $e = if ($onPath) {'\'} else {'.'}; $cl[$b+3]=[char]$e }
-                    else               { if ($b-1 -ge 0) { $e = if ($onPath) {'/'} else {'.'}; $cl[$b-1]=[char]$e } }
+                    $cc = [int]$ch.col; $dc = $cc - $c; $b = $c*4
+                    if     ($dc -eq 0) { $cl[$b+1]=[char]'|' }
+                    elseif ($dc -gt 0) { $cl[$b+3]=[char]'\' }
+                    else               { if ($b-1 -ge 0) { $cl[$b-1]=[char]'/' } }
                 }
             }
             $body += "   " + (-join $cl)
@@ -675,7 +673,7 @@ function Format-RunMapGraph($save) {
     [array]::Reverse($body)   # boss at top
     $flip = $body | ForEach-Object { (($_ -replace '/',[char]1) -replace '\\','/') -replace ([char]1),'\' }
     $sb = New-Object System.Text.StringBuilder
-    [void]$sb.AppendLine("MAP - $($save.acts[$ai].id)    ( )=visited  *=here  solid=your path  .=fork")
+    [void]$sb.AppendLine("MAP - $($save.acts[$ai].id)    ( )=visited  *=you are here  / \ |=branches")
     [void]$sb.AppendLine("")
     $flip | ForEach-Object { [void]$sb.AppendLine($_) }
     [void]$sb.AppendLine("")
