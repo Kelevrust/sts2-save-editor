@@ -192,6 +192,10 @@ function Set-Warnings {
     if ($script:save) {
         if ($script:schema -ne $STS2_KNOWN_SCHEMA) { $warn += "Save schema $($script:schema) != tested $STS2_KNOWN_SCHEMA - edits risky." }
         if ($script:save.players.Count -gt 1) { $warn += "Multiplayer save ($($script:save.players.Count) players) - editing untested." }
+        # Steam Cloud is the #1 cause of "my edit reverted on load": if this save is
+        # cloud-tracked, Steam can pull the server copy down over your edit at launch.
+        $cloud = Get-Sts2CloudCacheInfo $script:SavePath
+        if ($cloud) { $warn += "Steam Cloud is tracking this save - turn Cloud OFF (game Properties AND Steam > Settings > Cloud) or edits get overwritten on launch." }
     }
     $lblWarn.Text = ($warn -join "  |  ")
 }

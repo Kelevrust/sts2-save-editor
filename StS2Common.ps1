@@ -5,7 +5,7 @@
 
 $Global:STS2_APPID        = '2868840'
 $Global:STS2_KNOWN_SCHEMA = 16   # save schema this editor was built/tested against
-$Global:STS2_TOOL_VERSION = 'v1.3.4'                # bump this with each release tag
+$Global:STS2_TOOL_VERSION = 'v1.3.5'                # bump this with each release tag
 $Global:STS2_REPO         = 'Kelevrust/sts2-save-editor'
 $Global:STS2_RELEASES_URL = "https://github.com/$STS2_REPO/releases/latest"
 
@@ -108,4 +108,47 @@ function Find-Sts2Save {
     }
     if ($folders.Count) { return (Join-Path $folders[0] 'current_run.save') }  # may not exist
     return $null
+}
+
+# Inspect Steam Cloud's remotecache.vdf for a save file. Steam stores StS2 saves
+# under ...\userdata\<id>\<appid>\remote\..., and remotecache.vdf (a sibling of
+# 'remote') records the size/sha/times Steam last synced. If the save has an
+# entry there, Steam Cloud is/was tracking it and can overwrite local edits on
+# launch. Returns $null when not tracked (or no cache), else a hashtable with the
+# cached size/sha and whether the on-disk size still matches (cheap last-writer
+# hint for later). Pure-read, no Steam API.
+function Get-Sts2CloudCacheInfo {
+    param([string]$SavePath)
+    if (-not $SavePath -or -not (Test-Path -LiteralPath $SavePath)) { return $null }
+    # Walk up to the 'remote' folder; remotecache.vdf sits beside it (one level up).
+    $remoteRoot = $null
+    $d = (Get-Item -LiteralPath $SavePath).DirectoryName
+    while ($d) {
+        if ((Split-Path $d -Leaf) -eq 'remote') { $remoteRoot = $d; break }
+        $d = Split-Path $d
+    }
+    if (-not $remoteRoot) { return $null }
+    $cache = Join-Path (Split-Path $remoteRoot) 'remotecache.vdf'
+    if (-not (Test-Path -LiteralPath $cache)) { return $null }
+    # Key in the vdf is the path relative to 'remote', forward-slashed and quoted.
+    $rel = $SavePath.Substring($remoteRoot.Length).TrimStart('\','/').Replace('\','/')
+    $txt = Get-Content -LiteralPath $cache -Raw -Encoding UTF8
+    $key = '"' + $rel + '"'
+    $i = $txt.IndexOf($key, [System.StringComparison]::OrdinalIgnoreCase)
+    if ($i -lt 0) { return $null }   # present in cloud folder but not tracked
+    $open  = $txt.IndexOf('{', $i)
+    $close = if ($open -ge 0) { $txt.IndexOf('}', $open) } else { -1 }
+    $block = if ($open -ge 0 -and $close -gt $open) { $txt.Substring($open, $close - $open) } else { '' }
+    $cachedSize = if ($block -match '"size"\s*"([^"]*)"') { $matches[1] } else { $null }
+    $cachedSha  = if ($block -match '"sha"\s*"([^"]*)"')  { $matches[1] } else { $null }
+    $fileSize   = (Get-Item -LiteralPath $SavePath).Length
+    return @{
+        Tracked    = $true
+        CachePath  = $cache
+        RelKey     = $rel
+        CachedSize = $cachedSize
+        CachedSha  = $cachedSha
+        FileSize   = $fileSize
+        SizeMatch  = ($cachedSize -eq "$fileSize")
+    }
 }
