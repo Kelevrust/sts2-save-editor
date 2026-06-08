@@ -5,7 +5,7 @@
 
 $Global:STS2_APPID        = '2868840'
 $Global:STS2_KNOWN_SCHEMA = 16   # save schema this editor was built/tested against
-$Global:STS2_TOOL_VERSION = 'v1.3.5'                # bump this with each release tag
+$Global:STS2_TOOL_VERSION = 'v1.4.0'                # bump this with each release tag
 $Global:STS2_REPO         = 'Kelevrust/sts2-save-editor'
 $Global:STS2_RELEASES_URL = "https://github.com/$STS2_REPO/releases/latest"
 
@@ -151,4 +151,12 @@ function Get-Sts2CloudCacheInfo {
         FileSize   = $fileSize
         SizeMatch  = ($cachedSize -eq "$fileSize")
     }
+}
+
+# SHA1 of a file as lowercase hex (matches the format Steam stores in
+# remotecache.vdf, so the two can be compared directly). $null on any error.
+function Get-Sts2FileSha {
+    param([string]$Path)
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $null }
+    try { return (Get-FileHash -LiteralPath $Path -Algorithm SHA1).Hash.ToLower() } catch { return $null }
 }

@@ -85,6 +85,54 @@ function Write-CrashLog($err, $context, [switch]$Quiet) {
 [System.Windows.Forms.Application]::add_ThreadException({ param($s, $e) Write-CrashLog $e.Exception 'UI event' })
 [System.AppDomain]::CurrentDomain.add_UnhandledException({ param($s, $e) Write-CrashLog $e.ExceptionObject 'fatal/non-UI' -Quiet })
 
+# ---- last-writer detection ----------------------------------------------
+# Stamp the SHA we wrote on each save, so on a later load we can tell whether
+# the save still holds the user's edit - and if not, pin who clobbered it
+# (Steam Cloud restoring the server copy is the usual culprit). Stamps live in
+# the editor folder, keyed by save path.
+$script:EditStampPath = Join-Path $PSScriptRoot '.last-edits.json'
+
+function Save-EditStamp($savePath, $sha) {
+    if (-not $savePath -or -not $sha) { return }
+    $stamps = @{}
+    if (Test-Path -LiteralPath $script:EditStampPath) {
+        try {
+            $obj = Get-Content -LiteralPath $script:EditStampPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            foreach ($pr in $obj.PSObject.Properties) { $stamps[$pr.Name] = $pr.Value }
+        } catch {}
+    }
+    $stamps[$savePath.ToLower()] = [pscustomobject]@{ sha = $sha; time = (Get-Date).ToString('o') }
+    try { ($stamps | ConvertTo-Json) | Set-Content -LiteralPath $script:EditStampPath -Encoding UTF8 } catch {}
+}
+
+function Get-EditStamp($savePath) {
+    if (-not $savePath -or -not (Test-Path -LiteralPath $script:EditStampPath)) { return $null }
+    try {
+        $obj  = Get-Content -LiteralPath $script:EditStampPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $prop = $obj.PSObject.Properties[$savePath.ToLower()]
+        if ($prop) { return $prop.Value }
+    } catch {}
+    return $null
+}
+
+# Returns a warning string if the save changed since our last edit, naming the
+# likely writer; $null when the edit is intact or we've never saved this file.
+function Get-LastWriterWarning {
+    if (-not $script:SavePath -or -not (Test-Path -LiteralPath $script:SavePath)) { return $null }
+    $stamp = Get-EditStamp $script:SavePath
+    if (-not $stamp) { return $null }                    # nothing we wrote to compare against
+    $fileSha = Get-Sts2FileSha $script:SavePath
+    if (-not $fileSha -or $fileSha -eq $stamp.sha) { return $null }   # edit still intact
+    $cloud = Get-Sts2CloudCacheInfo $script:SavePath
+    if ($cloud -and $cloud.CachedSha -and ($fileSha -eq $cloud.CachedSha.ToLower())) {
+        return "Your last edit was OVERWRITTEN - the save now matches Steam's cloud copy, so Steam Cloud reverted it. Turn Cloud OFF (game Properties AND Steam > Settings > Cloud), then re-edit."
+    }
+    if (Test-GameRunning) {
+        return "This save changed since your last edit and StS2 is running - the game rewrote it. Quit StS2, then edit."
+    }
+    return "This save changed since your last edit - something rewrote it (a played turn, or Steam Cloud). Re-check before relying on your edits."
+}
+
 # ---- shared state --------------------------------------------------------
 # Auto-detect the active run save unless one was passed in.
 # NOTE: no -Prompt here on purpose - never throw a confusing file dialog at a
@@ -261,6 +309,8 @@ function Set-Warnings {
         # cloud-tracked, Steam can pull the server copy down over your edit at launch.
         $cloud = Get-Sts2CloudCacheInfo $script:SavePath
         if ($cloud) { $warn += "Steam Cloud is tracking this save - turn Cloud OFF (game Properties AND Steam > Settings > Cloud) or edits get overwritten on launch." }
+        $lastWriter = Get-LastWriterWarning
+        if ($lastWriter) { $warn += $lastWriter }
     }
     $lblWarn.Text = ($warn -join "  |  ")
 }
@@ -896,6 +946,7 @@ $btnApply.Add_Click({
     try {
         $json = $script:save | ConvertTo-Json -Depth 100
         [System.IO.File]::WriteAllText($script:SavePath, $json, [System.Text.UTF8Encoding]::new($false))
+        Save-EditStamp $script:SavePath (Get-Sts2FileSha $script:SavePath)   # remember what we wrote (last-writer detection)
         $lblStatus.Text = "Saved $stamp. Re-launch the game. (backup kept)"
     } catch {
         $lblStatus.Text = "Save failed: $($_.Exception.Message)"
