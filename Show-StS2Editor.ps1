@@ -463,11 +463,19 @@ function Format-Archetype($a) {
     return $sb.ToString()
 }
 
-# Keep the drawer pinned to the editor's right edge, matching its height.
+# Keep the drawers pinned to the editor: Builds on the right, Run Map on the
+# left, both matching the editor's height so they read as attached panels.
 function Set-DrawerPosition {
     if ($script:buildsWin -and -not $script:buildsWin.IsDisposed) {
         $script:buildsWin.Location = New-Object System.Drawing.Point(($form.Location.X + $form.Width), $form.Location.Y)
         $script:buildsWin.Height   = $form.Height
+    }
+    if ($script:mapWin -and -not $script:mapWin.IsDisposed) {
+        $wa = [System.Windows.Forms.Screen]::FromControl($form).WorkingArea
+        $x  = $form.Location.X - $script:mapWin.Width
+        if ($x -lt $wa.Left) { $x = $wa.Left }   # keep on-screen if editor hugs the left edge
+        $script:mapWin.Location = New-Object System.Drawing.Point($x, $form.Location.Y)
+        $script:mapWin.Height   = $form.Height
     }
 }
 $form.Add_Move({   Set-DrawerPosition })
@@ -722,7 +730,8 @@ $btnMap.Add_Click({
 
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = "Run Map  (seed $($script:save.rng.seed))"
-    $dlg.Size = New-Object System.Drawing.Size(520, 660); $dlg.StartPosition = "CenterParent"
+    $dlg.Size = New-Object System.Drawing.Size(520, 660); $dlg.StartPosition = "Manual"
+    $dlg.FormBorderStyle = 'SizableToolWindow'
     $dlg.ShowInTaskbar = $false
     # script-scoped so the toolbar handlers still resolve them after this
     # (non-modal) click handler returns and its locals are gone.
@@ -749,7 +758,9 @@ $btnMap.Add_Click({
     $dlg.Controls.Add($script:mapTb); $dlg.Controls.Add($bar)
     $script:mapWin = $dlg
     $dlg.Add_FormClosed({ $script:mapWin = $null })
+    Set-DrawerPosition
     $dlg.Show($form)          # non-modal: editor stays usable (like Builds)
+    Set-DrawerPosition        # re-pin: some props settle only after Show
 })
 
 # ---- reload / find / apply / close --------------------------------------
