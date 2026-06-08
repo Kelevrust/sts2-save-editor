@@ -56,6 +56,9 @@ If an edit ever "doesn't work," Steam Cloud is still on somewhere.
 - **What's Ahead** — shows the exact upcoming normal fights, elites, ? events, and boss
   for each act, read straight from your save. (A route planner, not a seed predictor — it
   only reveals what your run has already rolled.)
+- **Run Map** — draws the current act's branching map in ASCII (boss at top, your taken
+  path as solid lines, forks dotted), with each node typed. Export it or open it in the
+  browser renderer.
 - **Builds** — a side drawer: pick a class, pick a build, and see the key cards/relics up
   top with the play breakdown below. All five classes.
 - **Refresh IDs** — re-scans the game so the item lists stay current after a patch.

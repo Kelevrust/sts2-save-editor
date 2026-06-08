@@ -204,10 +204,14 @@ function Test-GameRunning {
 # ---- form ----------------------------------------------------------------
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "StS2 Save Editor"
-$form.Size = New-Object System.Drawing.Size(440, 854)
 $form.StartPosition = "CenterScreen"
-$form.FormBorderStyle = "FixedSingle"
+$form.FormBorderStyle = "Sizable"   # resizable; AutoScroll covers small screens
 $form.MaximizeBox = $false
+$form.AutoScroll = $true             # scrollbar if the window is shorter than the content
+# Fit the screen's WORKING area (excludes the taskbar) so the Apply button is never hidden.
+$wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+$form.ClientSize = New-Object System.Drawing.Size(440, [Math]::Min(840, $wa.Height - 40))
+$form.MinimumSize = New-Object System.Drawing.Size(456, 360)
 
 $y = 10
 function New-Label($text, $x, $yy, $w) {
@@ -626,10 +630,84 @@ function Format-RunMapMermaid($save) {
     }
     return $sb.ToString()
 }
+# Branching ASCII map of the current act (from saved_map), boss at top, path solid.
+function Format-RunMapGraph($save) {
+    $ai = [int]$save.current_act_index
+    $sm = $save.acts[$ai].saved_map
+    if (-not $sm -or -not $sm.points) { return "(no map data for this act)" }
+    $sym = @{ monster='M'; unknown='?'; rest_site='R'; elite='E'; shop='$'; treasure='T'; boss='B' }
+    $grid = @{}; foreach ($n in $sm.points) { $grid["$($n.coord.col),$($n.coord.row)"] = $n }
+    if ($sm.boss) { $grid["$($sm.boss.coord.col),$($sm.boss.coord.row)"] = $sm.boss }
+    $vis = @{}; foreach ($v in $save.visited_map_coords) { $vis["$($v.col),$($v.row)"] = $true }
+    $lastV = if ($save.visited_map_coords.Count) { $save.visited_map_coords[-1] } else { $null }
+    $w = [int]$sm.width; $maxr = 0
+    foreach ($k in $grid.Keys) { $rr = [int]((("$k") -split ',')[1]); if ($rr -gt $maxr) { $maxr = $rr } }
+    $body = @()
+    for ($r=0; $r -le $maxr; $r++) {
+        $line = (' ' * ($w*4)).ToCharArray()
+        for ($c=0; $c -lt $w; $c++) {
+            $n = $grid["$c,$r"]; if (-not $n) { continue }
+            $t = $sym[$n.type]; if (-not $t) { $t = '.' }
+            $lb='['; $rb=']'
+            if ($vis["$c,$r"]) { $lb='('; $rb=')' }
+            if ($lastV -and $lastV.col -eq $c -and $lastV.row -eq $r) { $lb='*'; $rb='*' }
+            $b = $c*4; $line[$b]=[char]$lb; $line[$b+1]=[char]$t; $line[$b+2]=[char]$rb
+        }
+        $body += ("{0,2} " -f $r) + (-join $line)
+        if ($r -lt $maxr) {
+            $cl = (' ' * ($w*4)).ToCharArray()
+            for ($c=0; $c -lt $w; $c++) {
+                $n = $grid["$c,$r"]; if (-not $n) { continue }
+                $aV = [bool]$vis["$c,$r"]
+                foreach ($ch in $n.children) {
+                    $cc = [int]$ch.col; $bV = [bool]$vis["$cc,$($r+1)"]; $onPath = $aV -and $bV
+                    $dc = $cc - $c; $b = $c*4
+                    if     ($dc -eq 0) { $cl[$b+1]=[char](if($onPath){'|'}else{'.'}) }
+                    elseif ($dc -gt 0) { $cl[$b+3]=[char](if($onPath){'\'}else{'.'}) }
+                    else               { if ($b-1 -ge 0) { $cl[$b-1]=[char](if($onPath){'/'}else{'.'}) } }
+                }
+            }
+            $body += "   " + (-join $cl)
+        }
+    }
+    [array]::Reverse($body)   # boss at top
+    $flip = $body | ForEach-Object { (($_ -replace '/',[char]1) -replace '\\','/') -replace ([char]1),'\' }
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.AppendLine("MAP - $($save.acts[$ai].id)    ( )=visited  *=here  solid=your path  .=fork")
+    [void]$sb.AppendLine("")
+    $flip | ForEach-Object { [void]$sb.AppendLine($_) }
+    [void]$sb.AppendLine("")
+    [void]$sb.AppendLine("M enemy  E elite  ? unknown  `$ merchant  R rest  T treasure  B boss")
+    return $sb.ToString()
+}
+# Mermaid of the current act graph (bottom-to-top), visited nodes outlined.
+function Format-RunMapGraphMermaid($save) {
+    $ai = [int]$save.current_act_index; $sm = $save.acts[$ai].saved_map
+    if (-not $sm -or -not $sm.points) { return "graph BT`n  x[No map data]" }
+    $cls = @{ monster='enemy'; unknown='unknown'; rest_site='rest'; elite='elite'; shop='merchant'; treasure='treasure'; boss='boss' }
+    $vis = @{}; foreach ($v in $save.visited_map_coords) { $vis["$($v.col),$($v.row)"] = $true }
+    $nodes = @($sm.points); if ($sm.boss) { $nodes += $sm.boss }
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.AppendLine('graph BT')
+    foreach ($d in @('enemy fill:#9aa,color:#000','elite fill:#8e44ad,color:#fff','unknown fill:#b7950b,color:#fff','rest fill:#c0392b,color:#fff','merchant fill:#27ae60,color:#fff','treasure fill:#7f8c8d,color:#fff','boss fill:#111,color:#fff','visited stroke:#000,stroke-width:4px')) { [void]$sb.AppendLine("  classDef $d;") }
+    foreach ($n in $nodes) {
+        $id = "n$($n.coord.col)_$($n.coord.row)"
+        $k = $cls[$n.type]; if (-not $k) { $k = 'unknown' }
+        $lbl = $k.Substring(0,1).ToUpper() + $k.Substring(1)
+        [void]$sb.AppendLine("  $id([`"$lbl`"])")
+        $klass = $k; if ($vis["$($n.coord.col),$($n.coord.row)"]) { $klass = "$k,visited" }
+        [void]$sb.AppendLine("  class $id $klass;")
+    }
+    foreach ($n in $nodes) {
+        $id = "n$($n.coord.col)_$($n.coord.row)"
+        foreach ($ch in $n.children) { [void]$sb.AppendLine("  $id --> n$($ch.col)_$($ch.row)") }
+    }
+    return $sb.ToString()
+}
 $btnMap.Add_Click({
     if (-not $script:save) { $lblStatus.Text = "No run loaded."; return }
-    $ascii   = Format-RunMap $script:save
-    $mermaid = Format-RunMapMermaid $script:save
+    $ascii   = (Format-RunMapGraph $script:save) + "`r`n`r`n" + (Format-RunMap $script:save)
+    $mermaid = Format-RunMapGraphMermaid $script:save
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = "Run Map  (seed $($script:save.rng.seed))"
     $dlg.Size = New-Object System.Drawing.Size(520, 660); $dlg.StartPosition = "CenterParent"
@@ -754,5 +832,9 @@ $updTimer.Add_Tick({
     }
 })
 $form.Add_Shown({ $updTimer.Start() })
+
+# Make sure the scroll range reaches the lowest control (the Apply button / status).
+$bottom = ($form.Controls | ForEach-Object { $_.Bottom } | Measure-Object -Maximum).Maximum
+$form.AutoScrollMinSize = New-Object System.Drawing.Size(0, ($bottom + 12))
 
 [void]$form.ShowDialog()
