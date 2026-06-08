@@ -662,9 +662,9 @@ function Format-RunMapGraph($save) {
                 foreach ($ch in $n.children) {
                     $cc = [int]$ch.col; $bV = [bool]$vis["$cc,$($r+1)"]; $onPath = $aV -and $bV
                     $dc = $cc - $c; $b = $c*4
-                    if     ($dc -eq 0) { $cl[$b+1]=[char](if($onPath){'|'}else{'.'}) }
-                    elseif ($dc -gt 0) { $cl[$b+3]=[char](if($onPath){'\'}else{'.'}) }
-                    else               { if ($b-1 -ge 0) { $cl[$b-1]=[char](if($onPath){'/'}else{'.'}) } }
+                    if     ($dc -eq 0) { $e = if ($onPath) {'|'} else {'.'}; $cl[$b+1]=[char]$e }
+                    elseif ($dc -gt 0) { $e = if ($onPath) {'\'} else {'.'}; $cl[$b+3]=[char]$e }
+                    else               { if ($b-1 -ge 0) { $e = if ($onPath) {'/'} else {'.'}; $cl[$b-1]=[char]$e } }
                 }
             }
             $body += "   " + (-join $cl)
