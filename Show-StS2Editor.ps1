@@ -433,6 +433,7 @@ $btnRefresh.Add_Click({
 
 # ---- builds cheatsheet (anchored, non-modal drawer) --------------------
 $script:buildsWin = $null
+$script:mapWin    = $null   # non-modal Run Map window (single instance, like Builds)
 
 # Render one archetype (build): quick-glance lists on top, the play below.
 function Format-Archetype($a) {
@@ -706,34 +707,49 @@ function Format-RunMapGraphMermaid($save) {
 }
 $btnMap.Add_Click({
     if (-not $script:save) { $lblStatus.Text = "No run loaded."; return }
+    # Regenerate from the current save every open (so edits/progress show).
     $div   = "`r`n" + ('-' * 52) + "`r`n`r`n"
     $ascii = (Format-RunMapGraph $script:save) + $div + (Format-WhatAhead $script:save) + $div + (Format-RunMap $script:save)
-    $mermaid = Format-RunMapGraphMermaid $script:save
+    $script:mapMermaid = Format-RunMapGraphMermaid $script:save
+
+    # Already open? Refresh its contents and bring it forward (matches Builds).
+    if ($script:mapWin -and -not $script:mapWin.IsDisposed) {
+        $script:mapTb.Text = ($ascii -replace "`n","`r`n")
+        $script:mapLbl.Text = ""
+        $script:mapWin.Activate()
+        return
+    }
+
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = "Run Map  (seed $($script:save.rng.seed))"
     $dlg.Size = New-Object System.Drawing.Size(520, 660); $dlg.StartPosition = "CenterParent"
-    $tb = New-Object System.Windows.Forms.TextBox
-    $tb.Multiline=$true; $tb.ReadOnly=$true; $tb.ScrollBars='Vertical'; $tb.Dock='Fill'
-    $tb.Font = New-Object System.Drawing.Font("Consolas", 9); $tb.Text = ($ascii -replace "`n","`r`n")
+    $dlg.ShowInTaskbar = $false
+    # script-scoped so the toolbar handlers still resolve them after this
+    # (non-modal) click handler returns and its locals are gone.
+    $script:mapTb = New-Object System.Windows.Forms.TextBox
+    $script:mapTb.Multiline=$true; $script:mapTb.ReadOnly=$true; $script:mapTb.ScrollBars='Vertical'; $script:mapTb.Dock='Fill'
+    $script:mapTb.Font = New-Object System.Drawing.Font("Consolas", 9); $script:mapTb.Text = ($ascii -replace "`n","`r`n")
     $bar = New-Object System.Windows.Forms.Panel; $bar.Dock='Bottom'; $bar.Height=40
     $bExp  = New-Object System.Windows.Forms.Button; $bExp.Text='Export .md';        $bExp.SetBounds(8,8,100,26)
     $bLink = New-Object System.Windows.Forms.Button; $bLink.Text='Copy render link';  $bLink.SetBounds(114,8,130,26)
-    $lbl   = New-Object System.Windows.Forms.Label;  $lbl.SetBounds(250,12,250,22)
+    $script:mapLbl = New-Object System.Windows.Forms.Label; $script:mapLbl.SetBounds(250,12,250,22)
     $bExp.Add_Click({
         $fence = [string][char]96 * 3
-        $md = "# StS2 Run Map`r`n`r`nPaste the block below at https://kelevrust.github.io/sts2-save-editor/map.html (or https://mermaid.live) to view/download it.`r`n`r`n${fence}mermaid`r`n${mermaid}`r`n${fence}`r`n"
+        $md = "# StS2 Run Map`r`n`r`nPaste the block below at https://kelevrust.github.io/sts2-save-editor/map.html (or https://mermaid.live) to view/download it.`r`n`r`n${fence}mermaid`r`n$($script:mapMermaid)`r`n${fence}`r`n"
         $p = Join-Path ([Environment]::GetFolderPath('Desktop')) 'StS2-run-map.md'
         [System.IO.File]::WriteAllText($p, $md, [System.Text.UTF8Encoding]::new($false))
-        $lbl.Text = "Saved -> Desktop\StS2-run-map.md"
+        $script:mapLbl.Text = "Saved -> Desktop\StS2-run-map.md"
     })
     $bLink.Add_Click({
-        $b = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($mermaid)) -replace '\+','-' -replace '/','_' -replace '=',''
+        $b = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($script:mapMermaid)) -replace '\+','-' -replace '/','_' -replace '=',''
         [System.Windows.Forms.Clipboard]::SetText("https://kelevrust.github.io/sts2-save-editor/map.html#m=$b")
-        $lbl.Text = "Render link copied to clipboard"
+        $script:mapLbl.Text = "Render link copied to clipboard"
     })
-    $bar.Controls.AddRange(@($bExp,$bLink,$lbl))
-    $dlg.Controls.Add($tb); $dlg.Controls.Add($bar)
-    [void]$dlg.ShowDialog()
+    $bar.Controls.AddRange(@($bExp,$bLink,$script:mapLbl))
+    $dlg.Controls.Add($script:mapTb); $dlg.Controls.Add($bar)
+    $script:mapWin = $dlg
+    $dlg.Add_FormClosed({ $script:mapWin = $null })
+    $dlg.Show($form)          # non-modal: editor stays usable (like Builds)
 })
 
 # ---- reload / find / apply / close --------------------------------------
