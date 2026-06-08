@@ -6,3 +6,6 @@ _*.save
 _loc.txt
 *.tmp
 *.bak
+
+# crash log written next to the editor at runtime
+crash-log.txt

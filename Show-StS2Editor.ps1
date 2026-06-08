@@ -20,6 +20,71 @@ Add-Type -AssemblyName System.Drawing
 
 . (Join-Path $PSScriptRoot 'StS2Common.ps1')
 
+# ---- crash capture -------------------------------------------------------
+# Global net for the PS 5.1 click-only crashes the parse/AST tests can't reach:
+# event-handler exceptions are dispatched by the WinForms message loop, so one
+# ThreadException registration catches them all. Logs next to the editor and
+# shows a copyable dialog; the app keeps running so the user can report + retry.
+$script:CrashLog = Join-Path $PSScriptRoot 'crash-log.txt'
+
+function Build-CrashReport($err, $context) {
+    $ex    = if ($err -is [System.Management.Automation.ErrorRecord]) { $err.Exception } else { $err }
+    $msg   = if ($ex) { $ex.Message } else { "$err" }
+    $type  = if ($ex) { $ex.GetType().FullName } else { 'unknown' }
+    $stack = if (($err -is [System.Management.Automation.ErrorRecord]) -and $err.ScriptStackTrace) { $err.ScriptStackTrace } elseif ($ex -and $ex.StackTrace) { $ex.StackTrace } else { '(no stack)' }
+    $stamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    return @"
+==== StS2 Save Editor crash ====
+Time     : $stamp
+Version  : $STS2_TOOL_VERSION
+Context  : $context
+PSVersion: $($PSVersionTable.PSVersion)
+OS       : $([System.Environment]::OSVersion.VersionString)
+Type     : $type
+Message  : $msg
+Stack    :
+$stack
+================================
+"@
+}
+
+function Show-CrashDialog($report) {
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = "StS2 Save Editor - something went wrong"
+    $dlg.Size = New-Object System.Drawing.Size(580, 440); $dlg.StartPosition = 'CenterScreen'
+    $tb = New-Object System.Windows.Forms.TextBox
+    $tb.Multiline=$true; $tb.ReadOnly=$true; $tb.ScrollBars='Both'; $tb.WordWrap=$false; $tb.Dock='Fill'
+    $tb.Font = New-Object System.Drawing.Font("Consolas", 9)
+    $tb.Text = ($report -replace "`n","`r`n")
+    $bar = New-Object System.Windows.Forms.Panel; $bar.Dock='Bottom'; $bar.Height=66
+    $lbl = New-Object System.Windows.Forms.Label; $lbl.SetBounds(8,6,560,20)
+    $lbl.Text = "Saved to: $script:CrashLog   -   please copy this and report it."
+    $bCopy = New-Object System.Windows.Forms.Button; $bCopy.Text='Copy to clipboard'; $bCopy.SetBounds(8,32,150,26)
+    $bOk   = New-Object System.Windows.Forms.Button; $bOk.Text='Close';             $bOk.SetBounds(164,32,90,26)
+    $bCopy.Add_Click({ [System.Windows.Forms.Clipboard]::SetText($tb.Text); $lbl.Text = "Copied to clipboard.  ($script:CrashLog)" })
+    $bOk.Add_Click({ $dlg.Close() })
+    $bar.Controls.AddRange(@($lbl,$bCopy,$bOk))
+    $dlg.Controls.Add($tb); $dlg.Controls.Add($bar)
+    [void]$dlg.ShowDialog()
+}
+
+function Write-CrashLog($err, $context, [switch]$Quiet) {
+    $report = $null
+    try {
+        $report = Build-CrashReport $err $context
+        [System.IO.File]::AppendAllText($script:CrashLog, $report + "`r`n`r`n", [System.Text.UTF8Encoding]::new($false))
+    } catch {
+        if (-not $report) { $report = "StS2 crash (report build failed): $err" }
+    }
+    if ($Quiet) { return }
+    try { Show-CrashDialog $report }
+    catch { try { [System.Windows.Forms.MessageBox]::Show("$report", "StS2 crash") | Out-Null } catch {} }
+}
+
+[System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException)
+[System.Windows.Forms.Application]::add_ThreadException({ param($s, $e) Write-CrashLog $e.Exception 'UI event' })
+[System.AppDomain]::CurrentDomain.add_UnhandledException({ param($s, $e) Write-CrashLog $e.ExceptionObject 'fatal/non-UI' -Quiet })
+
 # ---- shared state --------------------------------------------------------
 # Auto-detect the active run save unless one was passed in.
 # NOTE: no -Prompt here on purpose - never throw a confusing file dialog at a
