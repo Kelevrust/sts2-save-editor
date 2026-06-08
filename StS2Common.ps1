@@ -5,7 +5,7 @@
 
 $Global:STS2_APPID        = '2868840'
 $Global:STS2_KNOWN_SCHEMA = 16   # save schema this editor was built/tested against
-$Global:STS2_TOOL_VERSION = 'v1.3.0'                # bump this with each release tag
+$Global:STS2_TOOL_VERSION = 'v1.3.1'                # bump this with each release tag
 $Global:STS2_REPO         = 'Kelevrust/sts2-save-editor'
 $Global:STS2_RELEASES_URL = "https://github.com/$STS2_REPO/releases/latest"
 

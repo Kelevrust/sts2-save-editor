@@ -546,22 +546,34 @@ $btnBuilds.Add_Click({
 # ---- upcoming queues (what's in the RNG pools per act) ------------------
 function Format-WhatAhead($save) {
     $sb = New-Object System.Text.StringBuilder
+    [void]$sb.AppendLine("WHAT YOU'LL DRAW   (the map sets room types; these pools are drawn in this order as you enter rooms)")
+    [void]$sb.AppendLine("")
     $ai = [int]$save.current_act_index
+    $cats = @(
+        @('normal_encounter_ids','normal_encounters_visited','Fights'),
+        @('elite_encounter_ids','elite_encounters_visited','Elites'),
+        @('event_ids','events_visited','Events'))
     for ($k = $ai; $k -lt $save.acts.Count; $k++) {
         $act = $save.acts[$k]; $r = $act.rooms
         $tag = if ($k -eq $ai) { " (current)" } else { "" }
         [void]$sb.AppendLine("=== $($act.id)$tag ===")
-        foreach ($trip in @(
-            @('normal_encounter_ids','normal_encounters_visited','Normal fights'),
-            @('elite_encounter_ids','elite_encounters_visited','Elites'),
-            @('event_ids','events_visited','? events'))) {
-            $ids = $r.($trip[0]); $v = [int]$r.($trip[1])
-            $remaining = if ($k -eq $ai) { $v } else { 0 }   # only current act has progress
-            $upcoming = @($ids | Select-Object -Skip $remaining | Select-Object -First 8)
-            [void]$sb.AppendLine("  $($trip[2]) (next, in visit order):")
-            foreach ($x in $upcoming) { [void]$sb.AppendLine("     $($x -replace '^ENCOUNTER\.|^EVENT\.','')") }
+        # Likely-next summary: the very next draw from each pool (current act = honors progress).
+        [void]$sb.AppendLine("  Likely next:")
+        foreach ($cat in $cats) {
+            $ids = $r.($cat[0]); $v = if ($k -eq $ai) { [int]$r.($cat[1]) } else { 0 }
+            $nxt = @($ids | Select-Object -Skip $v | Select-Object -First 1)
+            $name = if ($nxt.Count) { Clean-ModelId $nxt[0] '' } else { '(none left)' }
+            [void]$sb.AppendLine(("     {0,-7} {1}" -f ($cat[2] + ':'), $name))
         }
-        [void]$sb.AppendLine("  BOSS: $($r.boss_id -replace '^ENCOUNTER\.','')")
+        [void]$sb.AppendLine("")
+        # Full draw order for each pool.
+        foreach ($cat in $cats) {
+            $ids = $r.($cat[0]); $v = if ($k -eq $ai) { [int]$r.($cat[1]) } else { 0 }
+            $upcoming = @($ids | Select-Object -Skip $v | Select-Object -First 8)
+            [void]$sb.AppendLine("  $($cat[2]) (draw order):")
+            foreach ($x in $upcoming) { [void]$sb.AppendLine("     " + (Clean-ModelId $x '')) }
+        }
+        [void]$sb.AppendLine("  BOSS: " + (Clean-ModelId $r.boss_id ''))
         [void]$sb.AppendLine("")
     }
     return $sb.ToString()
