@@ -18,6 +18,22 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
+# Dark title bars (Win10 20H1+/Win11) via DWM - no-op/harmless on older builds.
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class WinDwm {
+    [DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int val, int size);
+}
+"@
+function Set-TitleBarDark($form) {
+    try {
+        $v = [int][bool]$script:darkMode
+        [void][WinDwm]::DwmSetWindowAttribute($form.Handle, 20, [ref]$v, 4)  # DWMWA_USE_IMMERSIVE_DARK_MODE
+        [void][WinDwm]::DwmSetWindowAttribute($form.Handle, 19, [ref]$v, 4)  # older attribute id
+    } catch {}
+}
+
 . (Join-Path $PSScriptRoot 'StS2Common.ps1')
 
 # ---- crash capture -------------------------------------------------------
@@ -65,6 +81,7 @@ function Show-CrashDialog($report) {
     $bOk.Add_Click({ $dlg.Close() })
     $bar.Controls.AddRange(@($lbl,$bCopy,$bOk))
     $dlg.Controls.Add($tb); $dlg.Controls.Add($bar)
+    if (Get-Command Apply-Theme -ErrorAction SilentlyContinue) { Apply-Theme $dlg; $dlg.Add_Shown({ Set-TitleBarDark $dlg }) }
     [void]$dlg.ShowDialog()
 }
 
@@ -170,6 +187,42 @@ function Get-DockPref($key, $default) {
 }
 $script:mapDock    = Get-DockPref 'mapDock'    'left-near'
 $script:buildsDock = Get-DockPref 'buildsDock' 'right-near'
+
+# ---- theming (light / dark) ---------------------------------------------
+$script:darkMode = [bool](Get-Pref 'darkMode' $false)
+# Recolor a form/container and its children for the current theme. Recurses
+# into Panels; other containers (NumericUpDown) are treated as leaves.
+function Apply-Theme($ctrl) {
+    $dark = [bool]$script:darkMode
+    if ($dark) {
+        $back  = [System.Drawing.Color]::FromArgb(32,32,32)
+        $input = [System.Drawing.Color]::FromArgb(50,50,53)
+        $fore  = [System.Drawing.Color]::FromArgb(240,240,240)
+        $link  = [System.Drawing.Color]::FromArgb(90,170,255)
+        $btnBk = $input; $fstyle = 'Flat'; $brd = [System.Drawing.Color]::FromArgb(85,85,90)
+    } else {
+        $back  = [System.Drawing.SystemColors]::Control
+        $input = [System.Drawing.SystemColors]::Window
+        $fore  = [System.Drawing.SystemColors]::ControlText
+        $link  = [System.Drawing.SystemColors]::HotTrack
+        $btnBk = [System.Drawing.SystemColors]::Control; $fstyle = 'Standard'; $brd = [System.Drawing.SystemColors]::ControlDark
+    }
+    $ctrl.BackColor = $back; $ctrl.ForeColor = $fore
+    foreach ($c in $ctrl.Controls) {
+        switch ($c.GetType().Name) {
+            'TextBox'       { $c.BackColor = $input; $c.ForeColor = $fore }
+            'ComboBox'      { $c.BackColor = $input; $c.ForeColor = $fore; $c.FlatStyle = $fstyle }
+            'ListBox'       { $c.BackColor = $input; $c.ForeColor = $fore }
+            'NumericUpDown' { $c.BackColor = $input; $c.ForeColor = $fore }
+            'Button'        { $c.BackColor = $btnBk; $c.ForeColor = $fore; $c.FlatStyle = $fstyle; $c.FlatAppearance.BorderColor = $brd }
+            'LinkLabel'     { $c.BackColor = $back; $c.LinkColor = $link; $c.ActiveLinkColor = $link }
+            'Panel'         { Apply-Theme $c }
+            default         { $c.BackColor = $back; $c.ForeColor = $fore }
+        }
+    }
+}
+# Theme a drawer/dialog and dark-tint its title bar in one call.
+function Apply-ThemeWindow($win) { Apply-Theme $win; Set-TitleBarDark $win }
 
 # ---- shared state --------------------------------------------------------
 # Auto-detect the active run save unless one was passed in.
@@ -497,6 +550,16 @@ $y += 40
 $btnMap    = New-Button "Run Map"      10 $y 100
 $btnBuilds = New-Button "Builds"      115 $y 62
 $btnFind   = New-Button "Find..."     182 $y 62   # opt-in manual locate (auto-detect fallback)
+$chkDark = New-Object System.Windows.Forms.CheckBox
+$chkDark.Text = "Dark"; $chkDark.SetBounds(252, $y, 70, 26)
+$form.Controls.Add($chkDark)
+$chkDark.Add_CheckedChanged({
+    $script:darkMode = $chkDark.Checked
+    Set-Pref 'darkMode' $script:darkMode
+    Apply-ThemeWindow $form
+    if ($script:buildsWin -and -not $script:buildsWin.IsDisposed) { Apply-ThemeWindow $script:buildsWin }
+    if ($script:mapWin    -and -not $script:mapWin.IsDisposed)    { Apply-ThemeWindow $script:mapWin }
+})
 $y += 32
 
 # Action buttons
@@ -733,9 +796,11 @@ $btnBuilds.Add_Click({
     $idx = 0
     for ($i = 0; $i -lt $script:dChar.Items.Count; $i++) { if ($script:dChar.Items[$i].Key -eq $want) { $idx = $i; break } }
 
+    Apply-Theme $dlg
     Set-DrawerPosition
     $dlg.Show($form)          # non-modal: editor stays usable
     Set-DrawerPosition
+    Set-TitleBarDark $dlg
     if ($script:dChar.Items.Count) { $script:dChar.SelectedIndex = $idx }
 })
 
@@ -956,9 +1021,11 @@ $btnMap.Add_Click({
     $dlg.Controls.Add($script:mapTb); $dlg.Controls.Add($bar)
     $script:mapWin = $dlg
     $dlg.Add_FormClosed({ $script:mapWin = $null })
+    Apply-Theme $dlg
     Set-DrawerPosition
     $dlg.Show($form)          # non-modal: editor stays usable (like Builds)
     Set-DrawerPosition        # re-pin: some props settle only after Show
+    Set-TitleBarDark $dlg
 })
 
 # ---- reload / find / apply / close --------------------------------------
@@ -1047,6 +1114,10 @@ $found = Load-Save
 Set-RunState $found
 Set-Warnings
 
+# Apply the saved theme (checkbox reflects it; Apply-Theme is idempotent).
+$chkDark.Checked = $script:darkMode
+Apply-Theme $form
+
 # Check for a newer release ~0.4s after the window shows (keeps launch instant).
 $updTimer = New-Object System.Windows.Forms.Timer
 $updTimer.Interval = 400
@@ -1058,7 +1129,7 @@ $updTimer.Add_Tick({
         $llUpdate.Visible = $true
     }
 })
-$form.Add_Shown({ $updTimer.Start() })
+$form.Add_Shown({ $updTimer.Start(); Set-TitleBarDark $form })
 
 # Make sure the scroll range reaches the lowest control (the Apply button / status).
 $bottom = ($form.Controls | ForEach-Object { $_.Bottom } | Measure-Object -Maximum).Maximum
