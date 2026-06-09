@@ -1088,12 +1088,16 @@ $btnApply.Add_Click({
         $lblStatus.Text = "Backup failed: $($_.Exception.Message)"; return
     }
 
-    # write
+    # write - to EVERY copy of this run (game's AppData file + Steam mirror), so
+    # the game can't revert the edit by rewriting from a copy we missed.
     try {
         $json = $script:save | ConvertTo-Json -Depth 100
-        [System.IO.File]::WriteAllText($script:SavePath, $json, [System.Text.UTF8Encoding]::new($false))
+        $enc  = [System.Text.UTF8Encoding]::new($false)
+        $targets = @(Get-Sts2SaveTargets $script:SavePath $script:save)
+        foreach ($t in $targets) { [System.IO.File]::WriteAllText($t, $json, $enc) }
         Save-EditStamp $script:SavePath (Get-Sts2FileSha $script:SavePath)   # remember what we wrote (last-writer detection)
-        $lblStatus.Text = "Saved $stamp. Re-launch the game. (backup kept)"
+        $copies = if ($targets.Count -gt 1) { " to $($targets.Count) copies" } else { "" }
+        $lblStatus.Text = "Saved $stamp$copies. Re-launch the game. (backup kept)"
     } catch {
         $lblStatus.Text = "Save failed: $($_.Exception.Message)"
     }

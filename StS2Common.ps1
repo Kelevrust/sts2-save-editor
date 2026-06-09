@@ -5,7 +5,7 @@
 
 $Global:STS2_APPID        = '2868840'
 $Global:STS2_KNOWN_SCHEMA = 16   # save schema this editor was built/tested against
-$Global:STS2_TOOL_VERSION = 'v1.6.0'                # bump this with each release tag
+$Global:STS2_TOOL_VERSION = 'v1.7.0'                # bump this with each release tag
 $Global:STS2_REPO         = 'Kelevrust/sts2-save-editor'
 $Global:STS2_RELEASES_URL = "https://github.com/$STS2_REPO/releases/latest"
 
@@ -67,29 +67,61 @@ function Find-Sts2Pck {
     return $null
 }
 
-# --- locate the saves folder(s), newest first -----------------------------
+# --- locate the saves folder(s) ------------------------------------------
+# IMPORTANT: the game READS/WRITES its save in Godot's user dir under
+# %APPDATA%\SlayTheSpire2 (the authoritative copy). Steam Cloud keeps a MIRROR
+# under userdata\<acct>\<appid>\remote. Editing only the mirror loses to the
+# game on launch (it rewrites from AppData) - the cause of "edits revert". So we
+# return AppData folders FIRST (real file), then the Steam mirror.
 function Get-Sts2SaveFolders {
+    $hasRun = { (Test-Path (Join-Path $_.FullName 'progress.save')) -or (Test-Path (Join-Path $_.FullName 'current_run.save')) }
+    $byTime = { $cr = Join-Path $_ 'current_run.save'; if (Test-Path $cr) { (Get-Item $cr).LastWriteTime } else { [datetime]::MinValue } }
+
+    # (1) Game's real save dir - Godot user:// under AppData (authoritative)
+    $app = @()
+    $appRoot = Join-Path $env:APPDATA 'SlayTheSpire2'
+    if (Test-Path $appRoot) {
+        $app = @(Get-ChildItem $appRoot -Recurse -Directory -Filter 'saves' -ErrorAction SilentlyContinue | Where-Object $hasRun | ForEach-Object FullName)
+    }
+
+    # (2) Steam Cloud mirror - userdata\<acct>\<appid>\remote (synced by Steam)
+    $rem = @()
     $steam = Find-SteamRoot
-    if (-not $steam) { return @() }
-    $udata = Join-Path $steam 'userdata'
-    if (-not (Test-Path $udata)) { return @() }
-    $folders = @()
-    foreach ($acct in (Get-ChildItem $udata -Directory -ErrorAction SilentlyContinue)) {
-        $rem = Join-Path $acct.FullName "$STS2_APPID\remote"
-        if (Test-Path $rem) {
-            foreach ($sf in (Get-ChildItem $rem -Recurse -Directory -Filter 'saves' -ErrorAction SilentlyContinue)) {
-                if ((Test-Path (Join-Path $sf.FullName 'progress.save')) -or (Test-Path (Join-Path $sf.FullName 'current_run.save'))) {
-                    $folders += $sf.FullName
+    if ($steam) {
+        $udata = Join-Path $steam 'userdata'
+        if (Test-Path $udata) {
+            foreach ($acct in (Get-ChildItem $udata -Directory -ErrorAction SilentlyContinue)) {
+                $r = Join-Path $acct.FullName "$STS2_APPID\remote"
+                if (Test-Path $r) {
+                    $rem += @(Get-ChildItem $r -Recurse -Directory -Filter 'saves' -ErrorAction SilentlyContinue | Where-Object $hasRun | ForEach-Object FullName)
                 }
             }
         }
     }
-    return ($folders | Sort-Object {
-        $cr = Join-Path $_ 'current_run.save'; $pr = Join-Path $_ 'progress.save'
-        if (Test-Path $cr) { (Get-Item $cr).LastWriteTime }
-        elseif (Test-Path $pr) { (Get-Item $pr).LastWriteTime }
-        else { [datetime]::MinValue }
-    } -Descending)
+
+    return @(@($app | Sort-Object -Unique | Sort-Object $byTime -Descending) + @($rem | Sort-Object -Unique | Sort-Object $byTime -Descending))
+}
+
+# --- every current_run.save copy belonging to the SAME run ----------------
+# An edit must hit ALL copies the game/Steam keep in sync (AppData + remote),
+# but NEVER a different profile's run. We match by seed+start_time so only the
+# real run's copies are written. Always includes $PrimaryPath.
+function Get-Sts2SaveTargets {
+    param([string]$PrimaryPath, $Save)
+    $targets = New-Object System.Collections.Generic.List[string]
+    if ($PrimaryPath) { $targets.Add($PrimaryPath) }
+    if ($Save) {
+        $id = "$($Save.start_time)|$($Save.rng.seed)"
+        foreach ($f in (Get-Sts2SaveFolders)) {
+            $c = Join-Path $f 'current_run.save'
+            if (-not (Test-Path -LiteralPath $c)) { continue }
+            try {
+                $o = Get-Content -LiteralPath $c -Raw -Encoding UTF8 | ConvertFrom-Json
+                if ("$($o.start_time)|$($o.rng.seed)" -eq $id) { $targets.Add($c) }
+            } catch {}
+        }
+    }
+    return @($targets | Sort-Object -Unique)
 }
 
 # --- locate current_run.save (active run); picker fallback ----------------
