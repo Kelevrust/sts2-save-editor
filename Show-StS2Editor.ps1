@@ -283,7 +283,9 @@ function Fill-CardCombo($combo, $cardsObj) {
 function Get-PckPath { Find-Sts2Pck -Prompt }
 
 # Stream the (huge) pck in chunks and pull atlas sprite ids. Pure .NET, no rg.
-function Scan-Pck($pck) {
+# $progress (optional): a scriptblock called per chunk with (bytesDone, bytesTotal)
+# so the caller can keep the UI alive instead of going "Not Responding".
+function Scan-Pck($pck, $progress) {
     $relics  = New-Object 'System.Collections.Generic.HashSet[string]'
     $potions = New-Object 'System.Collections.Generic.HashSet[string]'
     $allowed = 'silent','ironclad','defect','regent','necrobinder','colorless','curse','status'
@@ -295,10 +297,12 @@ function Scan-Pck($pck) {
 
     $fs = [System.IO.File]::OpenRead($pck)
     try {
+        $total = $fs.Length; $done = 0
         $size = 16MB
         $buf  = New-Object byte[] $size
         $tail = ""
         while (($read = $fs.Read($buf, 0, $size)) -gt 0) {
+            $done += $read
             $chunk = $tail + $enc.GetString($buf, 0, $read)
             foreach ($m in $re.Matches($chunk)) {
                 $name = $m.Groups[3].Value.ToUpper()
@@ -310,6 +314,7 @@ function Scan-Pck($pck) {
                 }
             }
             $tail = if ($chunk.Length -gt 120) { $chunk.Substring($chunk.Length - 120) } else { $chunk }
+            if ($progress) { & $progress $done $total }
         }
     } finally { $fs.Dispose() }
 
@@ -631,10 +636,18 @@ $btnRefresh.Add_Click({
     if (-not $pck) { $lblStatus.Text = "Refresh cancelled (no .pck)."; return }
     $btnRefresh.Enabled = $false
     $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
-    $lblStatus.Text = "Scanning $([System.IO.Path]::GetFileName($pck)) (1-2 min, window will be busy)..."
+    $lblStatus.Text = "Scanning $([System.IO.Path]::GetFileName($pck))..."
     [System.Windows.Forms.Application]::DoEvents()
+    $script:spin = 0
     try {
-        $obj = Scan-Pck $pck
+        $obj = Scan-Pck $pck {
+            param($done, $total)
+            $frames = @('|','/',[char]0x2014,'\')   # em-dash via codepoint - avoids the 5.1 ANSI mojibake trap
+            $script:spin = ($script:spin + 1) % $frames.Count
+            $pct = if ($total -gt 0) { [int](100 * $done / $total) } else { 0 }
+            $lblStatus.Text = "Scanning .pck  $($frames[$script:spin])  $pct%  ($([int]($done/1MB))/$([int]($total/1MB)) MB)"
+            [System.Windows.Forms.Application]::DoEvents()
+        }
         $json = $obj | ConvertTo-Json -Depth 10
         [System.IO.File]::WriteAllText($idsPath, $json, [System.Text.UTF8Encoding]::new($false))
         $script:ids = $obj
