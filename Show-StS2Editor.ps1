@@ -848,6 +848,34 @@ function Format-WhatAhead($save) {
             foreach ($x in $upcoming) { [void]$sb.AppendLine("     " + (Clean-ModelId $x '')) }
         }
         [void]$sb.AppendLine("  BOSS: " + (Clean-ModelId $r.boss_id ''))
+        # The act's ancient (Neow-like). Its identity is known up front; the
+        # specific relic offering only populates once you reach it.
+        if ($r.ancient_id) {
+            $offers = @($r.ancient_choice | Where-Object { $_.TextKey })
+            if ($offers.Count) {
+                [void]$sb.AppendLine("  ANCIENT: " + (Clean-ModelId $r.ancient_id '') + " offers:")
+                foreach ($o in $offers) {
+                    $mark = if ($o.was_chosen) { ' (taken)' } else { '' }
+                    [void]$sb.AppendLine("     " + (Clean-ModelId $o.TextKey '') + $mark)
+                }
+            } else {
+                [void]$sb.AppendLine("  ANCIENT: " + (Clean-ModelId $r.ancient_id '') + " (offering revealed when you reach it)")
+            }
+        }
+        [void]$sb.AppendLine("")
+    }
+    # Relics: pre-rolled draw order per rarity (run-wide). Which rarity drops
+    # depends on the roll at award time, just like the encounter queues above.
+    $bag = $save.players[0].relic_grab_bag.relic_id_lists
+    if ($bag) {
+        [void]$sb.AppendLine("=== RELICS (draw order - which rarity you get depends on the roll) ===")
+        foreach ($rar in 'common','uncommon','rare','shop') {
+            $lst = @($bag.$rar)
+            if (-not $lst.Count) { continue }
+            [void]$sb.AppendLine("  $((Get-Culture).TextInfo.ToTitleCase($rar)):")
+            foreach ($rl in (@($lst | Select-Object -First 8))) { [void]$sb.AppendLine("     " + (Clean-ModelId $rl '')) }
+        }
+        [void]$sb.AppendLine("  (Shop list = relics that CAN appear in shops; actual shop card stock is rolled when you enter.)")
         [void]$sb.AppendLine("")
     }
     return $sb.ToString()
