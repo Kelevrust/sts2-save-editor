@@ -381,7 +381,7 @@ function Set-RunState($hasRun) {
         $cbAddRelic,$btnAddRelic,$btnDelRelic,
         $cbAddPotion,$btnAddPotion,$btnDelPotion,
         $cbAddCard,$chkUpg,$btnAddCard,$btnDelCard,
-        $btnApply,$btnMap
+        $btnApply,$btnMap,$cbReroll,$btnReroll,$btnUndo,$btnRestore
     )
     foreach ($c in $editCtrls) { $c.Enabled = $hasRun }
     if ($hasRun) {
@@ -418,7 +418,7 @@ function Test-GameRunning {
 
 # ---- form ----------------------------------------------------------------
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "StS2 Save Editor"
+$form.Text = "StS2 Save Editor $STS2_TOOL_VERSION"
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "Sizable"   # resizable; AutoScroll covers small screens
 $form.MaximizeBox = $false
@@ -486,6 +486,33 @@ $form.Controls.Add($nudShuffle)
 $btnReshuffle = New-Button "Reshuffle" 148 ($y-1) 95
 $lblShuf = New-Label "quit game first, then relaunch" 250 ($y+3) 175
 $lblShuf.ForeColor = [System.Drawing.Color]::Gray
+$y += 34
+
+# Reroll (blind): bump a roll RNG counter so the next chest/shop/reward differs.
+# Blind + lumpy (see tooltip); must be done BEFORE you open/enter it.
+New-Label "Reroll" 10 ($y+3) 55 | Out-Null
+$cbReroll = New-Object System.Windows.Forms.ComboBox
+$cbReroll.SetBounds(68, $y, 150, 24); $cbReroll.DropDownStyle = 'DropDownList'
+[void]$cbReroll.Items.AddRange(@('Chest relic','Shop cards/potions'))   # 'Combat reward' staged below but not offered until verified
+$cbReroll.SelectedIndex = 0
+$form.Controls.Add($cbReroll)
+$btnReroll = New-Button "Reroll" 226 ($y-1) 95
+$llRerollHelp = New-Object System.Windows.Forms.LinkLabel
+$llRerollHelp.Text = "blind - how?"; $llRerollHelp.SetBounds(326, ($y+4), 100, 20)
+$form.Controls.Add($llRerollHelp)
+$llRerollHelp.Add_LinkClicked({
+    $msg = "Blind reroll - how it works:`n`n" +
+           "- It bumps the game's RNG so the next chest/shop rolls differently. You can't pick or preview the result, and it's streaky (some tries land on the same thing).`n`n" +
+           "- Workflow: quit the game, click Reroll, relaunch, then open the chest / enter the shop.`n`n" +
+           "- You can load into a chest OR shop to PEEK, then quit WITHOUT taking anything and reroll for a different roll. The moment you take an item it's locked - and reroll is all-or-nothing (you can't keep one item and reroll the rest).`n`n" +
+           "- Shop reroll changes the cards & potions, not the relic slot.`n`n" +
+           "- Want an EXACT relic? Skip reroll - just add it directly with the relic dropdown above."
+    [System.Windows.Forms.MessageBox]::Show($msg, "How reroll works") | Out-Null
+})
+$tipReroll = New-Object System.Windows.Forms.ToolTip
+$tipReroll.AutoPopDelay = 20000; $tipReroll.InitialDelay = 300; $tipReroll.ReshowDelay = 100
+$tipReroll.SetToolTip($btnReroll, "Blind reroll: bumps the game's RNG so you get a DIFFERENT result - but you can't choose or preview it, and it's lumpy (some tries repeat). Do it BEFORE you take anything (peeking is fine), then relaunch. (Shop reroll changes cards & potions, not the relic slot.)")
+$tipReroll.SetToolTip($cbReroll, "Pick what to reroll, then click Reroll. Blind - you can't pick the exact result.")
 $y += 34
 
 # Relics
@@ -572,6 +599,13 @@ $btnReload = New-Button "Reload"       10 $y 90
 $btnApply  = New-Button "Apply + Save" 110 $y 130
 $btnApply.Font = New-Object System.Drawing.Font($btnApply.Font, [System.Drawing.FontStyle]::Bold)
 $btnClose  = New-Button "Close"        250 $y 90
+$y += 34
+
+# Undo / Restore - roll the save back to an auto-backup (made before every save).
+$btnUndo    = New-Button "Undo"       10 $y 90
+$btnRestore = New-Button "Restore..." 110 $y 100
+$lblRestore = New-Label "roll back a bad edit (quit game first)" 218 ($y+4) 210
+$lblRestore.ForeColor = [System.Drawing.Color]::Gray
 $y += 34
 
 $lblStatus = New-Label "" 10 $y 410
@@ -1150,6 +1184,87 @@ $btnReshuffle.Add_Click({
     $nudShuffle.Value = [Math]::Min([decimal]$nudShuffle.Maximum, $nudShuffle.Value + 1)
     $btnApply.PerformClick()   # saves the bumped shuffle (backup + game-running warning)
     if ($lblStatus.Text -like 'Saved*') { $lblStatus.Text = "Reshuffled. Relaunch the game for a new draw on that fight." }
+})
+
+# Blind reroll: bump a roll RNG counter by a random amount, then save. The result
+# is unaimable/lumpy (see tooltip) and must be done BEFORE opening/entering.
+$btnReroll.Add_Click({
+    if (-not $script:save) { $lblStatus.Text = "No run loaded."; return }
+    $bump = Get-Random -Minimum 1 -Maximum 30
+    switch ("$($cbReroll.SelectedItem)") {
+        'Chest relic'   { $script:save.rng.counters.treasure_room_relics = [int]$script:save.rng.counters.treasure_room_relics + $bump; $what = 'chest relic' }
+        'Shop cards/potions' { $script:save.players[0].rng.counters.shops = [int]$script:save.players[0].rng.counters.shops + $bump; $what = 'shop cards & potions' }
+        # 'Combat reward' staged - same mechanism (rewards counter), not offered until verified in a fight:
+        'Combat reward' { $script:save.players[0].rng.counters.rewards    = [int]$script:save.players[0].rng.counters.rewards    + $bump; $what = 'combat reward' }
+        default         { $lblStatus.Text = "Pick something to reroll first."; return }
+    }
+    $btnApply.PerformClick()   # writes every copy of the run (backup + game-running warning)
+    if ($lblStatus.Text -like 'Saved*') { $lblStatus.Text = "Rerolled $what (blind, +$bump). Quit & relaunch BEFORE opening it." }
+})
+
+# ---- undo / restore ------------------------------------------------------
+# Roll the save back to a chosen backup: stash the CURRENT state first (so the
+# restore is itself recoverable), then write the backup to EVERY copy of the run
+# and reload the editor. $curPrefix names the safety copy ('pre-undo' is excluded
+# from the backup list so the Undo walk doesn't loop on its own stashes).
+function Restore-FromBackup($backupPath, $curPrefix) {
+    if (-not $script:save -or -not (Test-Path -LiteralPath $backupPath)) { return $false }
+    if (Test-GameRunning) { $lblStatus.Text = "Quit StS2 first - a restore would be overwritten."; return $false }
+    try {
+        $bdir = Join-Path $PSScriptRoot 'backups'
+        if (-not (Test-Path $bdir)) { New-Item -ItemType Directory -Path $bdir | Out-Null }
+        $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+        if ($script:SavePath -and (Test-Path -LiteralPath $script:SavePath)) {
+            Copy-Item -LiteralPath $script:SavePath -Destination (Join-Path $bdir "$curPrefix.$stamp.save") -ErrorAction SilentlyContinue
+        }
+        $json = Get-Content -LiteralPath $backupPath -Raw -Encoding UTF8
+        $obj  = $json | ConvertFrom-Json
+        $enc  = [System.Text.UTF8Encoding]::new($false)
+        $targets = @(Get-Sts2SaveTargets $script:SavePath $obj)
+        foreach ($t in $targets) { [System.IO.File]::WriteAllText($t, $json, $enc) }
+        $script:save = $obj; $script:p = $obj.players[0]
+        Refresh-Fields
+        Save-EditStamp $script:SavePath (Get-Sts2FileSha $script:SavePath)
+        $when = (Get-Item -LiteralPath $backupPath).LastWriteTime.ToString('MM-dd HH:mm')
+        $lblStatus.Text = "Restored to $when ($($targets.Count) copies). Quit/relaunch the game."
+        return $true
+    } catch { $lblStatus.Text = "Restore failed: $($_.Exception.Message)"; return $false }
+}
+
+# Undo: step back to the newest backup whose contents differ from the live save.
+$btnUndo.Add_Click({
+    if (-not $script:save) { $lblStatus.Text = "No run loaded."; return }
+    $cur = Get-Sts2FileSha $script:SavePath
+    $bks = @(Get-Sts2RunBackups (Join-Path $PSScriptRoot 'backups') $script:save)
+    $target = $bks | Where-Object { (Get-Sts2FileSha $_.Path) -ne $cur } | Select-Object -First 1
+    if (-not $target) { $lblStatus.Text = "Nothing older to undo to."; return }
+    [void](Restore-FromBackup $target.Path 'pre-undo')
+})
+
+# Restore...: pick any backup for this run (top = undo last, bottom = untouched start).
+$btnRestore.Add_Click({
+    if (-not $script:save) { $lblStatus.Text = "No run loaded."; return }
+    $bks = @(Get-Sts2RunBackups (Join-Path $PSScriptRoot 'backups') $script:save)
+    if (-not $bks.Count) { $lblStatus.Text = "No backups for this run yet."; return }
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = "Restore a backup"; $dlg.ClientSize = New-Object System.Drawing.Size(440, 360)
+    $dlg.FormBorderStyle = 'SizableToolWindow'; $dlg.StartPosition = 'CenterParent'
+    $lb = New-Object System.Windows.Forms.ListBox
+    $lb.SetBounds(8, 8, 424, 300); $lb.Font = New-Object System.Drawing.Font("Consolas", 9)
+    $lb.Anchor = [System.Windows.Forms.AnchorStyles]'Top,Bottom,Left,Right'
+    foreach ($b in $bks) { [void]$lb.Items.Add(("{0}   gold {1,-6} hp {2,-7} {3}" -f $b.When.ToString('MM-dd HH:mm'), $b.Gold, $b.Hp, ($b.Act -replace '^ACT\.',''))) }
+    $lb.SelectedIndex = 0
+    $bOk = New-Object System.Windows.Forms.Button; $bOk.Text = 'Restore'; $bOk.SetBounds(8, 318, 100, 30); $bOk.Anchor = [System.Windows.Forms.AnchorStyles]'Bottom,Left'
+    $bX  = New-Object System.Windows.Forms.Button; $bX.Text = 'Cancel'; $bX.SetBounds(116, 318, 90, 30); $bX.Anchor = [System.Windows.Forms.AnchorStyles]'Bottom,Left'
+    $bOk.Add_Click({
+        $i = $lb.SelectedIndex
+        if ($i -ge 0) { [void](Restore-FromBackup $bks[$i].Path 'current_run'); $dlg.Close() }
+    })
+    $bX.Add_Click({ $dlg.Close() })
+    $dlg.Controls.AddRange(@($lb, $bOk, $bX))
+    if (Get-Command Apply-Theme -ErrorAction SilentlyContinue) { Apply-Theme $dlg }
+    [void]$dlg.ShowDialog($form)
+    Set-TitleBarDark $dlg
 })
 
 # ---- boot ----------------------------------------------------------------

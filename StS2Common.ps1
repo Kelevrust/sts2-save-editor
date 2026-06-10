@@ -5,7 +5,7 @@
 
 $Global:STS2_APPID        = '2868840'
 $Global:STS2_KNOWN_SCHEMA = 16   # save schema this editor was built/tested against
-$Global:STS2_TOOL_VERSION = 'v1.8.0'                # bump this with each release tag
+$Global:STS2_TOOL_VERSION = 'v1.9.0'                # bump this with each release tag
 $Global:STS2_REPO         = 'Kelevrust/sts2-save-editor'
 $Global:STS2_RELEASES_URL = "https://github.com/$STS2_REPO/releases/latest"
 
@@ -191,4 +191,31 @@ function Get-Sts2FileSha {
     param([string]$Path)
     if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $null }
     try { return (Get-FileHash -LiteralPath $Path -Algorithm SHA1).Hash.ToLower() } catch { return $null }
+}
+
+# Backups in $BackupDir that belong to the SAME run as $Save (matched by
+# seed+start_time, so Undo/Restore never pulls in a different run or profile).
+# Returns newest-first, each with a bit of context for the picker. Powers both
+# the one-click Undo (newest) and the Restore... list (oldest = untouched start).
+function Get-Sts2RunBackups {
+    param([string]$BackupDir, $Save)
+    if (-not $BackupDir -or -not (Test-Path -LiteralPath $BackupDir) -or -not $Save) { return @() }
+    $id = "$($Save.start_time)|$($Save.rng.seed)"
+    $out = @()
+    foreach ($f in (Get-ChildItem -LiteralPath $BackupDir -Filter 'current_run.*.save' -File -ErrorAction SilentlyContinue)) {
+        try {
+            $o = Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ("$($o.start_time)|$($o.rng.seed)" -eq $id) {
+                $ai = [int]$o.current_act_index
+                $out += [pscustomobject]@{
+                    Path = $f.FullName
+                    When = $f.LastWriteTime
+                    Gold = [int]$o.players[0].gold
+                    Hp   = "$($o.players[0].current_hp)/$($o.players[0].max_hp)"
+                    Act  = "$($o.acts[$ai].id)"
+                }
+            }
+        } catch {}
+    }
+    return @($out | Sort-Object When -Descending)
 }
